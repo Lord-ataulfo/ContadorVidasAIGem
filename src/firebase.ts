@@ -10,19 +10,19 @@ let firebaseConfig: any = {
   firestoreDatabaseId: import.meta.env.VITE_FIREBASE_DATABASE_ID,
 };
 // Import the Firebase configuration from the local config file
-if (!firebaseConfig.apiKey) {
-  try {
+//if (!firebaseConfig.apiKey) {
+  //try {
     // @ts-ignore - This file might be missing in production/GitHub
-    const firebaseConfigJSON = await import('../firebase-applet-config.json');
-    firebaseConfig = {
-      const app = initializeApp(firebaseConfig);
-      export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-      export const auth = getAuth(app);
-    };
-  } catch (e) {
+    //const firebaseConfigJSON = await import('../firebase-applet-config.json');
+    //firebaseConfig = {
+      //const app = initializeApp(firebaseConfig);
+      //export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+      //export const auth = getAuth(app);
+   // };
+  //} catch (e) {
     console.error('Firebase configuration missing. Please set environment variables or provide firebase-applet-config.json');
-  }
-}
+  //}
+//}
 
 
 
