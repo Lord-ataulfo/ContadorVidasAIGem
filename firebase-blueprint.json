@@ -1,0 +1,131 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Stores user profile information, including their unique sharing code.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "The unique Firebase Auth UID."
+        },
+        "username": {
+          "type": "string",
+          "description": "The user's chosen display name."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "The user's email address."
+        },
+        "userCode": {
+          "type": "string",
+          "description": "A unique 6-character code for sharing (e.g., #A1B2C3)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the account was created."
+        },
+        "provider": {
+          "type": "string",
+          "enum": ["google", "email"],
+          "description": "The authentication provider used."
+        }
+      },
+      "required": ["uid", "username", "email", "userCode", "createdAt", "provider"]
+    },
+    "GameRecord": {
+      "title": "Game Record",
+      "description": "Stores the result of a completed game.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "gameType": { "type": "string", "enum": ["standard", "commander"] },
+        "startTime": { "type": "number" },
+        "endTime": { "type": "number" },
+        "duration": { "type": "number" },
+        "players": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "life": { "type": "number" },
+              "color": { "type": "string" },
+              "isEliminated": { "type": "boolean" }
+            }
+          }
+        },
+        "winnerName": { "type": "string" },
+        "participantUids": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["userId", "gameType", "startTime", "endTime", "duration", "players", "participantUids"]
+    },
+    "Friend": {
+      "title": "Friend Connection",
+      "description": "Stores a friendship between two users.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "friendUid": { "type": "string" },
+        "username": { "type": "string" },
+        "userCode": { "type": "string" },
+        "addedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "friendUid", "username", "userCode", "addedAt"]
+    "UserPublic": {
+      "title": "Public User Profile",
+      "description": "Stores non-sensitive user information for discovery and friends.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "username": { "type": "string" },
+        "userCode": { "type": "string" }
+      },
+      "required": ["uid", "username", "userCode"]
+    }
+  },
+  "firestore": {
+    "users/{uid}": {
+      "schema": "User",
+      "description": "Collection of user profiles indexed by Auth UID."
+    },
+    "users_public/{uid}": {
+      "schema": "UserPublic",
+      "description": "Public user information for discovery."
+    },
+    "users/{uid}/history/{gameId}": {
+      "schema": "GameRecord",
+      "description": "Game history for a specific user."
+    },
+    "users/{uid}/friends/{friendUid}": {
+      "schema": "Friend",
+      "description": "Friends list for a specific user."
+    },
+    "usernames/{username}": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "uid": { "type": "string" }
+        },
+        "required": ["uid"]
+      },
+      "description": "Helper collection to ensure username uniqueness."
+    },
+    "userCodes/{userCode}": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "uid": { "type": "string" }
+        },
+        "required": ["uid"]
+      },
+      "description": "Helper collection to ensure user code uniqueness."
+    }
+  }
+}

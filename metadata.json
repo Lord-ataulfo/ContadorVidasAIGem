@@ -1,0 +1,5 @@
+{
+  "name": "Remix: ATA Life Counter MTG",
+  "description": "A comprehensive life counter for Magic: The Gathering, supporting Standard and Commander formats with commander damage tracking and multi-player support.",
+  "requestFramePermissions": []
+}
