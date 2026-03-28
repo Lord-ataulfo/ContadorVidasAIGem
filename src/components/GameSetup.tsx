@@ -187,12 +187,12 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
       <div className="fixed inset-0 z-0 pointer-events-none">
         <img 
           src="https://images.unsplash.com/photo-1590424753858-3c6a17638f6c?auto=format&fit=crop&q=80&w=1920" 
-          alt="Wolf Background"
-          className="w-full h-full object-cover opacity-60 scale-105"
+          alt="Epic Wolf"
+          className="w-full h-full object-cover opacity-80 scale-105"
           referrerPolicy="no-referrer"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-zinc-950/80 via-zinc-950/40 to-zinc-950" />
-        <div className="absolute inset-0 bg-zinc-950/20 backdrop-blur-[1px]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-zinc-950/40 via-zinc-950/10 to-zinc-950" />
+        <div className="absolute inset-0 bg-zinc-950/5" />
       </div>
 
       <motion.div 
