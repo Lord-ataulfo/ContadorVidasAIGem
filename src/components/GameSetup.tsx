@@ -186,7 +186,7 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
       {/* Background Image with Overlay */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         <img 
-          src="https://images.unsplash.com/photo-1494515843206-f3117d3f51b7?auto=format&fit=crop&q=80&w=1920" 
+          src="https://images.unsplash.com/photo-1590424753858-3c6a17638f6c?auto=format&fit=crop&q=80&w=1920" 
           alt="Wolf Background"
           className="w-full h-full object-cover opacity-60 scale-105"
           referrerPolicy="no-referrer"

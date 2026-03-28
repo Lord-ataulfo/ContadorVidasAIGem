@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useState, useCallback, useEffect, ErrorInfo, ReactNode } from 'react';
+import { useState, useCallback, useEffect, ErrorInfo, ReactNode, useRef } from 'react';
 import { Menu, RotateCcw, Home, Trophy, AlertTriangle, RefreshCw, LogOut, LogIn } from 'lucide-react';
 import { GameType, Player, GameState, UserProfile } from './types';
 import GameSetup from './components/GameSetup.tsx';
@@ -100,7 +100,7 @@ export default function App() {
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [showLoginSuggestion, setShowLoginSuggestion] = useState(false);
   const [pendingGameConfig, setPendingGameConfig] = useState<{ type: GameType; playerConfigs: { name: string; color: string; uid?: string }[] } | null>(null);
-  const [isRemoteUpdate, setIsRemoteUpdate] = useState(false);
+  const isProcessingRemoteUpdate = useRef(false);
 
   useEffect(() => {
     const unsubscribe = subscribeToAuthChanges(async (user) => {
@@ -150,23 +150,35 @@ export default function App() {
     if (gameState?.id) {
       const unsubscribe = listenToActiveGame(gameState.id, (remoteGame) => {
         if (remoteGame) {
-          // Check if remote update is newer or different
-          setIsRemoteUpdate(true);
+          // Mark that we are processing a remote update to avoid sync loop
+          isProcessingRemoteUpdate.current = true;
+          
           setGameState(prev => {
             if (!prev) return null;
-            // Only update if it's actually different to avoid flicker
-            if (JSON.stringify(prev.players) === JSON.stringify(remoteGame.players) && 
-                prev.isGameOver === remoteGame.isGameOver) {
+            
+            // Only update if there's an actual change to avoid unnecessary re-renders
+            const hasChanges = JSON.stringify(prev.players) !== JSON.stringify(remoteGame.players) || 
+                              prev.isGameOver !== remoteGame.isGameOver;
+            
+            if (!hasChanges) {
+              isProcessingRemoteUpdate.current = false;
               return prev;
             }
-            return {
+
+            const newState = {
               ...prev,
               players: remoteGame.players,
               isGameOver: remoteGame.isGameOver,
               winner: remoteGame.winner,
             };
+            
+            // Reset the flag after the state update is applied
+            setTimeout(() => {
+              isProcessingRemoteUpdate.current = false;
+            }, 100);
+            
+            return newState;
           });
-          setTimeout(() => setIsRemoteUpdate(false), 100);
         } else if (!gameState.isGameOver) {
           // Game was deleted by someone else
           setGameState(null);
@@ -319,8 +331,8 @@ export default function App() {
 
       const newState = checkGameOver({ ...prev, players: newPlayers });
       
-      // Update Firestore if multiplayer and not a remote update
-      if (newState.id && !isRemoteUpdate) {
+      // Update Firestore if multiplayer and NOT a remote update
+      if (newState.id && !isProcessingRemoteUpdate.current) {
         updateActiveGame(newState.id, { 
           players: newState.players,
           isGameOver: newState.isGameOver,
@@ -330,7 +342,7 @@ export default function App() {
 
       return newState;
     });
-  }, [isRemoteUpdate]);
+  }, []);
 
   const handlePoisonChange = useCallback((playerId: number, amount: number) => {
     setGameState(prev => {
@@ -352,7 +364,7 @@ export default function App() {
 
       const newState = checkGameOver({ ...prev, players: newPlayers });
 
-      if (newState.id && !isRemoteUpdate) {
+      if (newState.id && !isProcessingRemoteUpdate.current) {
         updateActiveGame(newState.id, { 
           players: newState.players,
           isGameOver: newState.isGameOver,
@@ -362,7 +374,7 @@ export default function App() {
 
       return newState;
     });
-  }, [isRemoteUpdate]);
+  }, []);
 
   const handleCommanderDamageChange = useCallback((targetId: number, sourceId: number, amount: number) => {
     setGameState(prev => {
@@ -389,7 +401,7 @@ export default function App() {
 
       const newState = checkGameOver({ ...prev, players: newPlayers });
 
-      if (newState.id && !isRemoteUpdate) {
+      if (newState.id && !isProcessingRemoteUpdate.current) {
         updateActiveGame(newState.id, { 
           players: newState.players,
           isGameOver: newState.isGameOver,
@@ -399,7 +411,7 @@ export default function App() {
 
       return newState;
     });
-  }, [isRemoteUpdate]);
+  }, []);
 
   const resetGame = () => {
     if (!gameState) return;
