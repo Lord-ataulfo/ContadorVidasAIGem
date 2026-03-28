@@ -186,7 +186,7 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
       {/* Background Image with Overlay */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         <img 
-          src="https://images.unsplash.com/photo-1551028150-64b9f398f678?auto=format&fit=crop&q=80&w=1920" 
+          src="https://images.unsplash.com/photo-1494515843206-f3117d3f51b7?auto=format&fit=crop&q=80&w=1920" 
           alt="Wolf Background"
           className="w-full h-full object-cover opacity-60 scale-105"
           referrerPolicy="no-referrer"
@@ -200,7 +200,7 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
         animate={{ opacity: 1, y: 0 }}
         className="relative z-10 w-full max-w-md my-8"
       >
-        <div className="bg-zinc-900/80 backdrop-blur-md rounded-[2.5rem] p-8 border border-white/10 shadow-2xl space-y-8">
+        <div className="bg-zinc-900/40 backdrop-blur-xl rounded-[2.5rem] p-8 border border-white/10 shadow-2xl space-y-8">
           <div className="text-center space-y-4">
             <div className="space-y-1">
               <h1 className="text-4xl font-serif font-bold tracking-tighter sm:text-5xl text-emerald-500 drop-shadow-[0_2px_10px_rgba(16,185,129,0.3)]">ATA Life Counter</h1>

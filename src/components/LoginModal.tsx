@@ -64,7 +64,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose, onSuccess }) => {
         initial={{ scale: 0.9, y: 20 }}
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.9, y: 20 }}
-        className="w-full max-w-md bg-zinc-900 border border-white/10 rounded-3xl overflow-hidden shadow-2xl"
+        className="w-full max-w-md bg-zinc-900/40 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
         <div className="p-6 border-b border-white/10 flex items-center justify-between bg-white/5">
