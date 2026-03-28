@@ -2,31 +2,11 @@ import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, getDocFromServer, doc } from 'firebase/firestore';
 
-let firebaseConfig: any = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  firestoreDatabaseId: import.meta.env.VITE_FIREBASE_DATABASE_ID,
-};
+import firebaseConfig from '../firebase-applet-config.json';
 
-      const app = initializeApp(firebaseConfig);
-      export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-      export const auth = getAuth(app);
-// Import the Firebase configuration from the local config file
-//if (!firebaseConfig.apiKey) {
-  /*try {
-    // @ts-ignore - This file might be missing in production/GitHub
-    const firebaseConfigJSON = await import('../firebase-applet-config.json');
-    firebaseConfig = {
-      const app = initializeApp(firebaseConfig);
-      export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-      export const auth = getAuth(app);
-    };
-  } catch (e) {
-    console.error('Firebase configuration missing. Please set environment variables or provide firebase-applet-config.json');
-  }
-}*/
+const app = initializeApp(firebaseConfig);
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+export const auth = getAuth(app);
 
 
 

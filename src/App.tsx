@@ -10,9 +10,11 @@ import LoginModal from './components/LoginModal.tsx';
 import { Navigation } from './components/Navigation.tsx';
 import { HistoryModal } from './components/HistoryModal.tsx';
 import { FriendsModal } from './components/FriendsModal.tsx';
+import { LoginSuggestionModal } from './components/LoginSuggestionModal.tsx';
 import { motion, AnimatePresence } from 'motion/react';
 import { subscribeToAuthChanges, getUserProfile, logoutUser } from './services/authService.ts';
-import { saveGameRecord } from './services/gameService.ts';
+import { saveGameRecord, createActiveGame, updateActiveGame, listenToActiveGame, listenForInvites, deleteActiveGame } from './services/gameService.ts';
+import { ActiveGame } from './types.ts';
 
 // Error Boundary Component
 interface ErrorBoundaryProps {
@@ -96,6 +98,9 @@ export default function App() {
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [isFriendsModalOpen, setIsFriendsModalOpen] = useState(false);
   const [isAuthReady, setIsAuthReady] = useState(false);
+  const [showLoginSuggestion, setShowLoginSuggestion] = useState(false);
+  const [pendingGameConfig, setPendingGameConfig] = useState<{ type: GameType; playerConfigs: { name: string; color: string; uid?: string }[] } | null>(null);
+  const [isRemoteUpdate, setIsRemoteUpdate] = useState(false);
 
   useEffect(() => {
     const unsubscribe = subscribeToAuthChanges(async (user) => {
@@ -107,6 +112,9 @@ export default function App() {
           }
         } else {
           setUserProfile(null);
+          setGameState(null);
+          setIsHistoryModalOpen(false);
+          setIsFriendsModalOpen(false);
         }
       } catch (error) {
         console.error('Error fetching user profile:', error);
@@ -117,9 +125,60 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // Listen for invites when at home
+  useEffect(() => {
+    if (isAuthReady && userProfile && !gameState) {
+      const unsubscribe = listenForInvites(userProfile.uid, (games) => {
+        if (games.length > 0) {
+          const game = games[0];
+          setGameState({
+            id: game.id,
+            gameType: game.gameType,
+            players: game.players,
+            startTime: game.startTime,
+            isGameOver: game.isGameOver,
+            winner: game.winner,
+          });
+        }
+      });
+      return () => unsubscribe();
+    }
+  }, [isAuthReady, userProfile, !!gameState]);
+
+  // Listen to current active game
+  useEffect(() => {
+    if (gameState?.id) {
+      const unsubscribe = listenToActiveGame(gameState.id, (remoteGame) => {
+        if (remoteGame) {
+          // Check if remote update is newer or different
+          setIsRemoteUpdate(true);
+          setGameState(prev => {
+            if (!prev) return null;
+            // Only update if it's actually different to avoid flicker
+            if (JSON.stringify(prev.players) === JSON.stringify(remoteGame.players) && 
+                prev.isGameOver === remoteGame.isGameOver) {
+              return prev;
+            }
+            return {
+              ...prev,
+              players: remoteGame.players,
+              isGameOver: remoteGame.isGameOver,
+              winner: remoteGame.winner,
+            };
+          });
+          setTimeout(() => setIsRemoteUpdate(false), 100);
+        } else if (!gameState.isGameOver) {
+          // Game was deleted by someone else
+          setGameState(null);
+        }
+      });
+      return () => unsubscribe();
+    }
+  }, [gameState?.id]);
+
   // Automatic Game Saving
   useEffect(() => {
-    if (gameState?.isGameOver && userProfile && gameState.startTime) {
+    if (gameState?.isGameOver && userProfile && gameState.startTime && !gameState.hasBeenSaved) {
       const winner = gameState.winner;
       if (winner) {
         const participantUids = gameState.players
@@ -141,10 +200,13 @@ export default function App() {
           winnerName: winner.name,
           participantUids
         };
+        
+        // Mark as saved immediately to prevent duplicate calls
+        setGameState(prev => prev ? { ...prev, hasBeenSaved: true } : null);
         saveGameRecord(record);
       }
     }
-  }, [gameState?.isGameOver, userProfile]);
+  }, [gameState?.isGameOver, userProfile, gameState?.hasBeenSaved]);
 
   const handleLogout = async () => {
     try {
@@ -155,6 +217,15 @@ export default function App() {
   };
 
   const startGame = (type: GameType, playerConfigs: { name: string; color: string; uid?: string }[]) => {
+    if (!userProfile) {
+      setPendingGameConfig({ type, playerConfigs });
+      setShowLoginSuggestion(true);
+      return;
+    }
+    proceedWithGame(type, playerConfigs);
+  };
+
+  const proceedWithGame = async (type: GameType, playerConfigs: { name: string; color: string; uid?: string }[]) => {
     const initialLife = type === 'standard' ? 20 : 40;
     const players: Player[] = playerConfigs.map((config, i) => ({
       id: i,
@@ -164,16 +235,39 @@ export default function App() {
       color: config.color,
       isEliminated: false,
       commanderDamage: {},
-      toxicDamage: 0,
+      poisonDamage: 0,
     }));
 
-    setGameState({
+    const participantUids = players.map(p => p.uid).filter(Boolean) as string[];
+    const isMultiplayer = participantUids.length > 1;
+    const gameId = isMultiplayer ? `game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}` : undefined;
+
+    const newGameState: GameState = {
+      id: gameId,
       gameType: type,
       players,
       startTime: Date.now(),
       isGameOver: false,
       winner: null,
-    });
+    };
+
+    if (gameId) {
+      const activeGame: ActiveGame = {
+        id: gameId,
+        gameType: type,
+        startTime: newGameState.startTime!,
+        isGameOver: false,
+        players,
+        winner: null,
+        participantUids,
+        lastUpdated: Date.now(),
+      };
+      await createActiveGame(activeGame);
+    }
+
+    setGameState(newGameState);
+    setShowLoginSuggestion(false);
+    setPendingGameConfig(null);
   };
 
   const checkGameOver = (state: GameState): GameState => {
@@ -211,9 +305,8 @@ export default function App() {
       const newPlayers = prev.players.map(p => {
         if (p.id === playerId) {
           const newLife = p.life + amount;
-          // Check all elimination conditions
           const maxCommanderDamage = (Object.values(p.commanderDamage) as number[]).reduce((max, val) => Math.max(max, val), 0);
-          const isEliminated = newLife <= 0 || (p.toxicDamage as number) >= 11 || maxCommanderDamage >= 21;
+          const isEliminated = newLife <= 0 || (p.poisonDamage as number) >= 11 || maxCommanderDamage >= 21;
           
           return { 
             ...p, 
@@ -224,34 +317,52 @@ export default function App() {
         return p;
       });
 
-      return checkGameOver({ ...prev, players: newPlayers });
-    });
-  }, []);
+      const newState = checkGameOver({ ...prev, players: newPlayers });
+      
+      // Update Firestore if multiplayer and not a remote update
+      if (newState.id && !isRemoteUpdate) {
+        updateActiveGame(newState.id, { 
+          players: newState.players,
+          isGameOver: newState.isGameOver,
+          winner: newState.winner
+        });
+      }
 
-  const handleToxicChange = useCallback((playerId: number, amount: number) => {
+      return newState;
+    });
+  }, [isRemoteUpdate]);
+
+  const handlePoisonChange = useCallback((playerId: number, amount: number) => {
     setGameState(prev => {
       if (!prev) return null;
       const newPlayers = prev.players.map(p => {
         if (p.id === playerId) {
-          const newToxic = Math.max(0, p.toxicDamage + amount);
-          const newLife = p.life - amount; // Toxic damage also reduces life
-          
+          const newPoison = Math.max(0, p.poisonDamage + amount);
           const maxCommanderDamage = (Object.values(p.commanderDamage) as number[]).reduce((max, val) => Math.max(max, val), 0);
-          const isEliminated = newLife <= 0 || newToxic >= 11 || maxCommanderDamage >= 21;
+          const isEliminated = p.life <= 0 || newPoison >= 11 || maxCommanderDamage >= 21;
           
           return { 
             ...p, 
-            toxicDamage: newToxic,
-            life: newLife,
+            poisonDamage: newPoison,
             isEliminated
           };
         }
         return p;
       });
 
-      return checkGameOver({ ...prev, players: newPlayers });
+      const newState = checkGameOver({ ...prev, players: newPlayers });
+
+      if (newState.id && !isRemoteUpdate) {
+        updateActiveGame(newState.id, { 
+          players: newState.players,
+          isGameOver: newState.isGameOver,
+          winner: newState.winner
+        });
+      }
+
+      return newState;
     });
-  }, []);
+  }, [isRemoteUpdate]);
 
   const handleCommanderDamageChange = useCallback((targetId: number, sourceId: number, amount: number) => {
     setGameState(prev => {
@@ -262,12 +373,9 @@ export default function App() {
           const currentDamage = (p.commanderDamage[sourceIdStr] as number | undefined) || 0;
           const newDamage = Math.max(0, currentDamage + amount);
           const newCommanderDamage = { ...p.commanderDamage, [sourceIdStr]: newDamage };
-          
-          // Commander damage also reduces life
           const newLife = p.life - amount;
-          
           const maxCommanderDamage = (Object.values(newCommanderDamage) as number[]).reduce((max, val) => Math.max(max, val), 0);
-          const isEliminated = newLife <= 0 || (p.toxicDamage as number) >= 11 || maxCommanderDamage >= 21;
+          const isEliminated = newLife <= 0 || (p.poisonDamage as number) >= 11 || maxCommanderDamage >= 21;
           
           return { 
             ...p, 
@@ -279,9 +387,19 @@ export default function App() {
         return p;
       });
 
-      return checkGameOver({ ...prev, players: newPlayers });
+      const newState = checkGameOver({ ...prev, players: newPlayers });
+
+      if (newState.id && !isRemoteUpdate) {
+        updateActiveGame(newState.id, { 
+          players: newState.players,
+          isGameOver: newState.isGameOver,
+          winner: newState.winner
+        });
+      }
+
+      return newState;
     });
-  }, []);
+  }, [isRemoteUpdate]);
 
   const resetGame = () => {
     if (!gameState) return;
@@ -295,6 +413,9 @@ export default function App() {
   };
 
   const exitToHome = () => {
+    if (gameState?.id) {
+      deleteActiveGame(gameState.id);
+    }
     setGameState(null);
     setShowMenu(false);
   };
@@ -322,7 +443,7 @@ export default function App() {
             onFriendsClick={() => setIsFriendsModalOpen(true)}
             onHomeClick={exitToHome}
           />
-          <main className="lg:pl-20 pt-16 lg:pt-0 min-h-screen">
+          <main className="lg:pl-20 pt-16 lg:pt-0 min-h-screen bg-transparent">
             <GameSetup 
               onStart={startGame} 
               userProfile={userProfile}
@@ -337,6 +458,9 @@ export default function App() {
                 onSuccess={(profile) => {
                   setUserProfile(profile);
                   setShowLoginModal(false);
+                  if (pendingGameConfig) {
+                    proceedWithGame(pendingGameConfig.type, pendingGameConfig.playerConfigs);
+                  }
                 }} 
               />
             )}
@@ -348,6 +472,19 @@ export default function App() {
           <FriendsModal
             isOpen={isFriendsModalOpen}
             onClose={() => setIsFriendsModalOpen(false)}
+          />
+          <LoginSuggestionModal
+            isOpen={showLoginSuggestion}
+            onClose={() => setShowLoginSuggestion(false)}
+            onLogin={() => {
+              setShowLoginSuggestion(false);
+              setShowLoginModal(true);
+            }}
+            onContinue={() => {
+              if (pendingGameConfig) {
+                proceedWithGame(pendingGameConfig.type, pendingGameConfig.playerConfigs);
+              }
+            }}
           />
         </div>
       </ErrorBoundary>
@@ -427,7 +564,7 @@ export default function App() {
                 gameType={gameState.gameType}
                 totalPlayers={gameState.players.length}
                 onLifeChange={handleLifeChange}
-                onToxicChange={handleToxicChange}
+                onPoisonChange={handlePoisonChange}
                 onCommanderDamageClick={setSelectedPlayerForDamage}
               />
             ))}
@@ -504,6 +641,9 @@ export default function App() {
               onSuccess={(profile) => {
                 setUserProfile(profile);
                 setShowLoginModal(false);
+                if (pendingGameConfig) {
+                  proceedWithGame(pendingGameConfig.type, pendingGameConfig.playerConfigs);
+                }
               }} 
             />
           )}

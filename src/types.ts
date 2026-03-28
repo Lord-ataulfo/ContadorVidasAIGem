@@ -47,13 +47,26 @@ export interface Player {
   color: string;
   isEliminated: boolean;
   commanderDamage: CommanderDamage;
-  toxicDamage: number;
+  poisonDamage: number;
 }
 
 export interface GameState {
+  id?: string;
   gameType: GameType;
   players: Player[];
   startTime: number | null;
   isGameOver: boolean;
   winner: Player | null;
+  hasBeenSaved?: boolean;
+}
+
+export interface ActiveGame {
+  id: string;
+  gameType: GameType;
+  startTime: number;
+  isGameOver: boolean;
+  players: Player[];
+  winner: Player | null;
+  participantUids: string[];
+  lastUpdated: number;
 }

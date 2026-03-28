@@ -223,7 +223,20 @@ export const getUserProfile = async (uid: string): Promise<UserProfile | null> =
   }
 };
 
-export const getUserByCode = async (userCode: string): Promise<UserProfile | null> => {
+export const getPublicProfile = async (uid: string): Promise<{ uid: string; username: string; userCode: string } | null> => {
+  try {
+    const userDoc = await getDoc(doc(db, 'users_public', uid));
+    if (userDoc.exists()) {
+      return userDoc.data() as { uid: string; username: string; userCode: string };
+    }
+    return null;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.GET, 'users_public');
+    throw error;
+  }
+};
+
+export const getUserByCode = async (userCode: string): Promise<{ uid: string; username: string; userCode: string } | null> => {
   try {
     // Ensure the code starts with # and is uppercase
     const formattedCode = userCode.startsWith('#') ? userCode.toUpperCase() : `#${userCode.toUpperCase()}`;
@@ -231,7 +244,7 @@ export const getUserByCode = async (userCode: string): Promise<UserProfile | nul
     
     if (codeDoc.exists()) {
       const uid = codeDoc.data().uid;
-      return getUserProfile(uid);
+      return getPublicProfile(uid);
     }
     return null;
   } catch (error) {

@@ -7,7 +7,7 @@ interface PlayerCardProps {
   player: Player;
   players: Player[];
   onLifeChange: (playerId: number, amount: number) => void;
-  onToxicChange: (playerId: number, amount: number) => void;
+  onPoisonChange: (playerId: number, amount: number) => void;
   onCommanderDamageClick: (playerId: number) => void;
   gameType: GameType;
   totalPlayers: number;
@@ -17,15 +17,15 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
   player, 
   players,
   onLifeChange, 
-  onToxicChange,
+  onPoisonChange,
   onCommanderDamageClick,
   gameType,
   totalPlayers 
 }) => {
   const [change, setChange] = useState<number | null>(null);
-  const [toxicChange, setToxicChange] = useState<number | null>(null);
+  const [poisonChange, setPoisonChange] = useState<number | null>(null);
   const changeTimeout = useRef<NodeJS.Timeout | null>(null);
-  const toxicChangeTimeout = useRef<NodeJS.Timeout | null>(null);
+  const poisonChangeTimeout = useRef<NodeJS.Timeout | null>(null);
 
   const handleLifeChange = (amount: number) => {
     onLifeChange(player.id, amount);
@@ -37,13 +37,13 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
     }, 2000);
   };
 
-  const handleToxicChange = (amount: number) => {
-    onToxicChange(player.id, amount);
-    setToxicChange(prev => (prev || 0) + amount);
+  const handlePoisonChange = (amount: number) => {
+    onPoisonChange(player.id, amount);
+    setPoisonChange(prev => (prev || 0) + amount);
 
-    if (toxicChangeTimeout.current) clearTimeout(toxicChangeTimeout.current);
-    toxicChangeTimeout.current = setTimeout(() => {
-      setToxicChange(null);
+    if (poisonChangeTimeout.current) clearTimeout(poisonChangeTimeout.current);
+    poisonChangeTimeout.current = setTimeout(() => {
+      setPoisonChange(null);
     }, 2000);
   };
 
@@ -56,15 +56,15 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
       }`}
       style={{ backgroundColor: player.color }}
     >
-      {/* Background Image - Change the URLs below to use specific MTG card art if desired */}
+      {/* Background Image - Wolf-themed fantasy art */}
       <div className="absolute inset-0 z-0">
         <img 
-          src={`https://picsum.photos/seed/fantasy-epic-${['fortress', 'mountain', 'dark-swamp', 'lava', 'ancient-forest', 'dragon-fire', 'armored-knight', 'mystic-mage'][player.id % 8]}/800/600?blur=1`}
+          src={`https://images.unsplash.com/photo-${['1590420485404-f86d22b8abf8', '1557008075-7f2c5efa4cfd', '1551028150-64b9f398f678', '1590420485404-f86d22b8abf8', '1557008075-7f2c5efa4cfd', '1551028150-64b9f398f678', '1590420485404-f86d22b8abf8', '1557008075-7f2c5efa4cfd'][player.id % 8]}?auto=format&fit=crop&q=80&w=800`}
           alt=""
-          className="w-full h-full object-cover opacity-30 mix-blend-overlay"
+          className="w-full h-full object-cover opacity-40 mix-blend-multiply"
           referrerPolicy="no-referrer"
         />
-        <div className="absolute inset-0 bg-black/40" />
+        <div className="absolute inset-0 bg-black/20" />
       </div>
 
       {/* Background Pattern */}
@@ -133,43 +133,43 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
           </button>
         </div>
 
-        {/* Toxic Counter */}
+        {/* Poison Counter */}
         <div className="mt-4 flex flex-col items-center gap-1 w-full">
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest opacity-70">
             <Skull className="w-3 h-3" />
-            Toxic
+            Poison
           </div>
           <div className="relative flex items-center justify-center gap-4 w-full">
             <button 
-              onClick={() => handleToxicChange(-1)}
+              onClick={() => handlePoisonChange(-1)}
               className="p-2 rounded-xl bg-black/20 hover:bg-black/30 transition-colors active:scale-90"
             >
               <Minus className="w-4 h-4" />
             </button>
             
             <div className="relative">
-              <span className={`text-2xl font-black tabular-nums ${player.toxicDamage >= 8 ? 'text-rose-400' : 'text-white'}`}>
-                {player.toxicDamage}
+              <span className={`text-2xl font-black tabular-nums ${player.poisonDamage >= 8 ? 'text-rose-400' : 'text-white'}`}>
+                {player.poisonDamage}
               </span>
               <AnimatePresence>
-                {toxicChange !== null && (
+                {poisonChange !== null && (
                   <motion.div
-                    key="toxic-change-indicator"
+                    key="poison-change-indicator"
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 20 }}
                     exit={{ opacity: 0, y: 30 }}
                     className={`absolute left-1/2 -translate-x-1/2 font-bold text-sm ${
-                      toxicChange > 0 ? 'text-rose-400' : 'text-emerald-400'
+                      poisonChange > 0 ? 'text-rose-400' : 'text-emerald-400'
                     }`}
                   >
-                    {toxicChange > 0 ? `+${toxicChange}` : toxicChange}
+                    {poisonChange > 0 ? `+${poisonChange}` : poisonChange}
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
 
             <button 
-              onClick={() => handleToxicChange(1)}
+              onClick={() => handlePoisonChange(1)}
               className="p-2 rounded-xl bg-black/20 hover:bg-black/30 transition-colors active:scale-90"
             >
               <Plus className="w-4 h-4" />

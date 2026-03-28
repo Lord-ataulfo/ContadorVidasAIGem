@@ -88,9 +88,47 @@
         "userCode": { "type": "string" }
       },
       "required": ["uid", "username", "userCode"]
+    },
+    "ActiveGame": {
+      "title": "Active Game State",
+      "description": "Stores the current state of a game in progress for real-time syncing.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "gameType": { "type": "string", "enum": ["standard", "commander"] },
+        "startTime": { "type": "number" },
+        "isGameOver": { "type": "boolean" },
+        "players": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "number" },
+              "name": { "type": "string" },
+              "life": { "type": "number" },
+              "poison": { "type": "number" },
+              "commanderDamage": { "type": "object" },
+              "color": { "type": "string" },
+              "isEliminated": { "type": "boolean" },
+              "uid": { "type": "string" }
+            }
+          }
+        },
+        "winner": { "type": "object" },
+        "participantUids": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "lastUpdated": { "type": "number" }
+      },
+      "required": ["id", "gameType", "startTime", "isGameOver", "players", "participantUids", "lastUpdated"]
     }
   },
   "firestore": {
+    "active_games/{gameId}": {
+      "schema": "ActiveGame",
+      "description": "Collection of active game sessions for real-time updates."
+    },
     "users/{uid}": {
       "schema": "User",
       "description": "Collection of user profiles indexed by Auth UID."

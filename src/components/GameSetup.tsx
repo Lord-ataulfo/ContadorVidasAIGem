@@ -27,18 +27,30 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
   const [playerCount, setPlayerCount] = useState(2);
   const [playerNames, setPlayerNames] = useState<string[]>(['', '', '', '', '', '', '', '']);
   const [playerUids, setPlayerUids] = useState<(string | undefined)[]>(Array(8).fill(undefined));
+  const [errors, setErrors] = useState<(string | null)[]>(Array(8).fill(null));
   const [searchingIndex, setSearchingIndex] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
+  const prevUserRef = React.useRef(userProfile);
 
   useEffect(() => {
-    if (userProfile && playerNames[0] === '') {
+    // If logging in, set the first player name
+    if (userProfile && !prevUserRef.current) {
       const newNames = [...playerNames];
       const newUids = [...playerUids];
       newNames[0] = userProfile.username;
       newUids[0] = userProfile.uid;
       setPlayerNames(newNames);
       setPlayerUids(newUids);
+    } 
+    // If logging out, clear the inputs
+    else if (!userProfile && prevUserRef.current) {
+      setPlayerNames(['', '', '', '', '', '', '', '']);
+      setPlayerUids(Array(8).fill(undefined));
+      setErrors(Array(8).fill(null));
+      setPlayerCount(2);
+      setGameType('standard');
     }
+    prevUserRef.current = userProfile;
   }, [userProfile]);
 
   const handleResolveCode = async (index: number) => {
@@ -46,6 +58,10 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
     if (!name.startsWith('#')) return;
 
     setSearchingIndex(index);
+    const newErrors = [...errors];
+    newErrors[index] = null;
+    setErrors(newErrors);
+
     try {
       const profile = await getUserByCode(name);
       if (profile) {
@@ -55,9 +71,16 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
         newUids[index] = profile.uid;
         setPlayerNames(newNames);
         setPlayerUids(newUids);
+      } else {
+        const updatedErrors = [...errors];
+        updatedErrors[index] = "User not found";
+        setErrors(updatedErrors);
       }
     } catch (err) {
       console.error('Error resolving code:', err);
+      const updatedErrors = [...errors];
+      updatedErrors[index] = "Error resolving code";
+      setErrors(updatedErrors);
     } finally {
       setSearchingIndex(null);
     }
@@ -99,6 +122,13 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
     newNames[index] = name;
     setPlayerNames(newNames);
     
+    // Clear error when typing
+    if (errors[index]) {
+      const newErrors = [...errors];
+      newErrors[index] = null;
+      setErrors(newErrors);
+    }
+
     // Clear UID if name is changed and it's not the resolved username
     if (playerUids[index] && name !== playerNames[index]) {
       const newUids = [...playerUids];
@@ -107,33 +137,81 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
     }
   };
 
-  const handleStart = () => {
+  const handleStart = async () => {
+    setSearchingIndex(-1); // Global loading state
+    const finalNames = [...playerNames];
+    const finalUids = [...playerUids];
+    const newErrors = [...errors];
+    let hasError = false;
+
+    for (let i = 0; i < playerCount; i++) {
+      const name = finalNames[i].trim();
+      if (name.startsWith('#') && !finalUids[i]) {
+        try {
+          const profile = await getUserByCode(name);
+          if (profile) {
+            finalNames[i] = profile.username;
+            finalUids[i] = profile.uid;
+            newErrors[i] = null;
+          } else {
+            newErrors[i] = "User not found";
+            hasError = true;
+          }
+        } catch (err) {
+          console.error(`Error resolving code for player ${i + 1}:`, err);
+          newErrors[i] = "Error resolving code";
+          hasError = true;
+        }
+      }
+    }
+
+    if (hasError) {
+      setErrors(newErrors);
+      setSearchingIndex(null);
+      return;
+    }
+
     const players = Array.from({ length: playerCount }, (_, i) => ({
-      name: playerNames[i].trim() || `Player ${i + 1}`,
+      name: finalNames[i].trim() || `Player ${i + 1}`,
       color: PLAYER_COLORS[i % PLAYER_COLORS.length],
-      uid: playerUids[i],
+      uid: finalUids[i],
     }));
+    
+    setSearchingIndex(null);
     onStart(gameType, players);
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-zinc-950 text-white overflow-y-auto">
+    <div className="relative flex flex-col items-center justify-center min-h-screen p-6 text-white overflow-y-auto overflow-x-hidden">
+      {/* Background Image with Overlay */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <img 
+          src="https://images.unsplash.com/photo-1551028150-64b9f398f678?auto=format&fit=crop&q=80&w=1920" 
+          alt="Wolf Background"
+          className="w-full h-full object-cover opacity-60 scale-105"
+          referrerPolicy="no-referrer"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-zinc-950/80 via-zinc-950/40 to-zinc-950" />
+        <div className="absolute inset-0 bg-zinc-950/20 backdrop-blur-[1px]" />
+      </div>
+
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md space-y-8 my-8"
+        className="relative z-10 w-full max-w-md my-8"
       >
-        <div className="text-center space-y-4">
-          <div className="space-y-1">
-            <h1 className="text-4xl font-serif font-bold tracking-tighter sm:text-5xl text-emerald-500">ATA Life Counter</h1>
-            <p className="text-zinc-400 text-sm">Select your game format and prepare for battle.</p>
-          </div>
+        <div className="bg-zinc-900/80 backdrop-blur-md rounded-[2.5rem] p-8 border border-white/10 shadow-2xl space-y-8">
+          <div className="text-center space-y-4">
+            <div className="space-y-1">
+              <h1 className="text-4xl font-serif font-bold tracking-tighter sm:text-5xl text-emerald-500 drop-shadow-[0_2px_10px_rgba(16,185,129,0.3)]">ATA Life Counter</h1>
+              <p className="text-zinc-300 text-sm">Select your game format and prepare for battle.</p>
+            </div>
 
           {userProfile && (
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="bg-zinc-900/50 border border-white/5 rounded-2xl p-4 flex flex-col items-center gap-2"
+              className="bg-zinc-950/60 border border-white/10 rounded-2xl p-4 flex flex-col items-center gap-2"
             >
               <div className="flex items-center gap-2 text-emerald-500">
                 <User className="w-4 h-4" />
@@ -170,8 +248,8 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
             onClick={() => setGameType('standard')}
             className={`flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all ${
               gameType === 'standard' 
-                ? 'bg-zinc-100 text-zinc-950 border-zinc-100' 
-                : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                ? 'bg-emerald-500 text-zinc-950 border-emerald-500' 
+                : 'bg-zinc-950/40 border-white/10 text-zinc-300 hover:border-white/20'
             }`}
           >
             <Swords className="w-8 h-8 mb-2" />
@@ -182,8 +260,8 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
             onClick={() => setGameType('commander')}
             className={`flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all ${
               gameType === 'commander' 
-                ? 'bg-zinc-100 text-zinc-950 border-zinc-100' 
-                : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                ? 'bg-emerald-500 text-zinc-950 border-emerald-500' 
+                : 'bg-zinc-950/40 border-white/10 text-zinc-300 hover:border-white/20'
             }`}
           >
             <Users className="w-8 h-8 mb-2" />
@@ -199,7 +277,7 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
               animate={{ opacity: 1, height: 'auto' }}
               className="space-y-4"
             >
-              <label className="block text-sm font-medium text-zinc-400 text-center">
+              <label className="block text-sm font-medium text-zinc-300 text-center">
                 Number of Players: {playerCount}
               </label>
               <input
@@ -220,7 +298,7 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
           )}
 
           <div className="space-y-3">
-            <label className="block text-sm font-medium text-zinc-400">
+            <label className="block text-sm font-medium text-zinc-300">
               Player Names (Type #CODE to invite)
             </label>
             <div className="grid grid-cols-1 gap-2">
@@ -236,8 +314,15 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
                       placeholder={i === 0 ? "Your Name" : `Player ${i + 1} or #CODE`}
                       value={playerNames[i]}
                       onChange={(e) => handleNameChange(i, e.target.value)}
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-zinc-600 transition-colors pr-10"
+                      className={`w-full bg-zinc-950 border rounded-xl px-4 py-2 text-sm focus:outline-none transition-colors pr-10 ${
+                        errors[i] ? 'border-red-500 focus:border-red-500' : 'border-zinc-800 focus:border-zinc-600'
+                      }`}
                     />
+                    {errors[i] && (
+                      <p className="text-[10px] text-red-500 mt-1 ml-1 font-bold uppercase tracking-wider">
+                        {errors[i]}
+                      </p>
+                    )}
                     {playerNames[i].startsWith('#') && (
                       <button
                         onClick={() => handleResolveCode(i)}
@@ -266,12 +351,18 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
 
         <button
           onClick={handleStart}
-          className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold rounded-2xl flex items-center justify-center gap-2 transition-colors shadow-lg shadow-emerald-500/20"
+          disabled={searchingIndex !== null}
+          className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50 uppercase tracking-widest"
         >
-          <Play className="w-5 h-5 fill-current" />
-          START GAME
+          {searchingIndex === -1 ? (
+            <Loader2 className="w-5 h-5 animate-spin" />
+          ) : (
+            <Play className="w-5 h-5 fill-current" />
+          )}
+          {searchingIndex === -1 ? 'Resolving...' : 'Start Battle'}
         </button>
-      </motion.div>
+      </div>
+    </motion.div>
     </div>
   );
 }
