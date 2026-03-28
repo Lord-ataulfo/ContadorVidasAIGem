@@ -1,5 +1,5 @@
 {
-  "name": "ATA Life Counter",
+  "name": "Kirocos",
   "description": "A comprehensive life counter for Magic: The Gathering, supporting Standard and Commander formats with commander damage tracking and multi-player support.",
   "requestFramePermissions": []
 }

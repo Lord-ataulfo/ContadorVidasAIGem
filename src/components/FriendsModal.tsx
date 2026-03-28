@@ -83,7 +83,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose }) =
                 </div>
                 <div>
                   <h2 className="text-2xl font-serif font-bold text-white tracking-tight">Friends</h2>
-                  <p className="text-zinc-500 text-xs uppercase tracking-widest font-bold">Ataufo's Life Counter community</p>
+                  <p className="text-zinc-500 text-xs uppercase tracking-widest font-bold">Kirocos community</p>
                 </div>
               </div>
               <button 

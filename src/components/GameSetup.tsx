@@ -98,8 +98,8 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
     if (userProfile?.userCode && navigator.share) {
       try {
         await navigator.share({
-          title: "My Ataufo's Life Counter Code",
-          text: `Join me on Ataufo's Life Counter! My user code is: ${userProfile.userCode}`,
+          title: "My Kirocos Code",
+          text: `Join me on Kirocos! My user code is: ${userProfile.userCode}`,
           url: window.location.href,
         });
       } catch (err: any) {
@@ -203,7 +203,7 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
         <div className="bg-zinc-900/40 backdrop-blur-xl rounded-[2.5rem] p-8 border border-white/10 shadow-2xl space-y-8">
           <div className="text-center space-y-4">
             <div className="space-y-1">
-              <h1 className="text-4xl font-serif font-bold tracking-tighter sm:text-5xl text-emerald-500 drop-shadow-[0_2px_10px_rgba(16,185,129,0.3)]">ATA Life Counter</h1>
+              <h1 className="text-4xl font-serif font-bold tracking-tighter sm:text-5xl text-emerald-500 drop-shadow-[0_2px_10px_rgba(16,185,129,0.3)]">Kirocos</h1>
               <p className="text-zinc-300 text-sm">Select your game format and prepare for battle.</p>
             </div>
 

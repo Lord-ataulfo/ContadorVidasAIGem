@@ -73,7 +73,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose, onSuccess }) => {
               {isRegister ? 'Create Account' : 'Welcome Back'}
             </h2>
             <p className="text-xs text-zinc-400 font-medium">
-              {isRegister ? "Ataufo's Life Counter community" : 'Log in to continue your journey'}
+              {isRegister ? "Kirocos community" : 'Log in to continue your journey'}
             </p>
           </div>
           <button 

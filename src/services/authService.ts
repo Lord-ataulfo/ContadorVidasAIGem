@@ -118,11 +118,11 @@ export const loginUser = async (email: string, password: string): Promise<UserPr
 };
 
 export const signInWithGoogle = async (): Promise<UserProfile> => {
-  const provider = new GoogleAuthProvider();
-  const userCredential = await signInWithPopup(auth, provider);
-  const user = userCredential.user;
-
   try {
+    const provider = new GoogleAuthProvider();
+    const userCredential = await signInWithPopup(auth, provider);
+    const user = userCredential.user;
+
     const userDoc = await getDoc(doc(db, USERS_COLLECTION, user.uid));
     
     if (userDoc.exists()) {
@@ -201,7 +201,9 @@ export const signInWithGoogle = async (): Promise<UserProfile> => {
     
     return userProfile;
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, USERS_COLLECTION);
+    if (error instanceof Error && (error.message.includes('permission') || error.message.includes('offline') || error.message.includes('auth/'))) {
+      handleFirestoreError(error, OperationType.WRITE, USERS_COLLECTION);
+    }
     throw error;
   }
 };

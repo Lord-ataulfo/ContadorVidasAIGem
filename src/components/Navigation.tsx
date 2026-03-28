@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Menu, X, History, Users, LogOut, LogIn, Home, 
-  ChevronRight, User as UserIcon 
+  ChevronRight, User as UserIcon, Swords 
 } from 'lucide-react';
 import { UserProfile } from '../types.ts';
 
@@ -40,7 +40,10 @@ export const Navigation: React.FC<NavigationProps> = ({
     <>
       {/* Mobile Header */}
       <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-zinc-950/80 backdrop-blur-md border-b border-white/5 flex items-center justify-between px-6 z-40">
-        <h1 className="text-xl font-serif font-bold text-emerald-500">ATA</h1>
+        <div className="flex items-center gap-2">
+          <Swords className="w-6 h-6 text-emerald-500" />
+          <span className="text-xl font-serif font-bold text-emerald-500">Kirocos</span>
+        </div>
         <button 
           onClick={() => setIsOpen(true)}
           className="p-2 text-zinc-400 hover:text-white transition-colors"
@@ -51,9 +54,9 @@ export const Navigation: React.FC<NavigationProps> = ({
 
       {/* Desktop Sidebar */}
       <div className="hidden lg:flex fixed left-0 top-0 bottom-0 w-20 hover:w-64 bg-zinc-950 border-r border-white/5 flex-col items-center py-8 transition-all duration-300 group z-40">
-        <div className="mb-12">
-          <h1 className="text-2xl font-serif font-bold text-emerald-500 group-hover:hidden">A</h1>
-          <h1 className="text-2xl font-serif font-bold text-emerald-500 hidden group-hover:block px-6">ATA Life</h1>
+        <div className="mb-12 flex flex-col items-center group-hover:items-start group-hover:px-6 w-full">
+          <Swords className="w-8 h-8 text-emerald-500 transition-transform duration-300 group-hover:scale-110" />
+          <h1 className="text-2xl font-serif font-bold text-emerald-500 mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap">Kirocos</h1>
         </div>
 
         <nav className="flex-1 w-full space-y-2 px-3">
