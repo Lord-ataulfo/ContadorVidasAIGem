@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useState, useCallback, useEffect, ErrorInfo, ReactNode, useRef } from 'react';
-import { Menu, RotateCcw, Home, Trophy, AlertTriangle, RefreshCw, LogOut, LogIn } from 'lucide-react';
+import { Menu, RotateCcw, Home, Trophy, AlertTriangle, RefreshCw, LogOut, LogIn, Cloud, CloudOff } from 'lucide-react';
 import { GameType, Player, GameState, UserProfile } from './types';
 import GameSetup from './components/GameSetup.tsx';
 import PlayerCard from './components/PlayerCard.tsx';
@@ -100,7 +100,8 @@ export default function App() {
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [showLoginSuggestion, setShowLoginSuggestion] = useState(false);
   const [pendingGameConfig, setPendingGameConfig] = useState<{ type: GameType; playerConfigs: { name: string; color: string; uid?: string; userCode?: string }[] } | null>(null);
-  const isProcessingRemoteUpdate = useRef(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const lastServerState = useRef<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = subscribeToAuthChanges(async (user) => {
@@ -151,44 +152,70 @@ export default function App() {
     if (gameState?.id) {
       const unsubscribe = listenToActiveGame(gameState.id, (remoteGame) => {
         if (remoteGame) {
-          // Mark that we are processing a remote update to avoid sync loop
-          isProcessingRemoteUpdate.current = true;
-          
+          const remoteStateStr = JSON.stringify({
+            players: remoteGame.players,
+            isGameOver: remoteGame.isGameOver,
+            winner: remoteGame.winner
+          });
+
+          // Update our "last known server state" ref to avoid echoing it back
+          lastServerState.current = remoteStateStr;
+
           setGameState(prev => {
             if (!prev) return null;
             
+            const currentStateStr = JSON.stringify({
+              players: prev.players,
+              isGameOver: prev.isGameOver,
+              winner: prev.winner
+            });
+
             // Only update if there's an actual change to avoid unnecessary re-renders
-            const hasChanges = JSON.stringify(prev.players) !== JSON.stringify(remoteGame.players) || 
-                              prev.isGameOver !== remoteGame.isGameOver;
-            
-            if (!hasChanges) {
-              isProcessingRemoteUpdate.current = false;
+            if (currentStateStr === remoteStateStr) {
               return prev;
             }
 
-            const newState = {
+            return {
               ...prev,
               players: remoteGame.players,
               isGameOver: remoteGame.isGameOver,
               winner: remoteGame.winner,
               hostUid: remoteGame.hostUid,
             };
-            
-            // Reset the flag after the state update is applied
-            setTimeout(() => {
-              isProcessingRemoteUpdate.current = false;
-            }, 100);
-            
-            return newState;
           });
-        } else if (!gameState.isGameOver) {
-          // Game was deleted by someone else
+        } else if (gameState && !gameState.isGameOver) {
+          // Game was deleted by someone else (likely the host)
           setGameState(null);
         }
       });
       return () => unsubscribe();
     }
   }, [gameState?.id]);
+
+  // Sync local changes to Firestore
+  useEffect(() => {
+    if (gameState?.id) {
+      const currentStateStr = JSON.stringify({
+        players: gameState.players,
+        isGameOver: gameState.isGameOver,
+        winner: gameState.winner
+      });
+
+      // Only sync if the current state is different from the last state we got from the server
+      if (currentStateStr !== lastServerState.current) {
+        setIsSyncing(true);
+        updateActiveGame(gameState.id, {
+          players: gameState.players,
+          isGameOver: gameState.isGameOver,
+          winner: gameState.winner
+        }).finally(() => {
+          setIsSyncing(false);
+        });
+        // Update the ref so we don't sync the same thing again
+        lastServerState.current = currentStateStr;
+      }
+    }
+  }, [gameState]);
 
   // Automatic Game Saving
   useEffect(() => {
@@ -341,16 +368,6 @@ export default function App() {
       });
 
       const newState = checkGameOver({ ...prev, players: newPlayers });
-      
-      // Update Firestore if multiplayer
-      if (newState.id) {
-        updateActiveGame(newState.id, { 
-          players: newState.players,
-          isGameOver: newState.isGameOver,
-          winner: newState.winner
-        });
-      }
-
       return newState;
     });
   }, []);
@@ -374,14 +391,6 @@ export default function App() {
       });
 
       const newState = checkGameOver({ ...prev, players: newPlayers });
-
-      if (newState.id) {
-        updateActiveGame(newState.id, { 
-          players: newState.players,
-          isGameOver: newState.isGameOver,
-          winner: newState.winner
-        });
-      }
 
       return newState;
     });
@@ -411,14 +420,6 @@ export default function App() {
       });
 
       const newState = checkGameOver({ ...prev, players: newPlayers });
-
-      if (newState.id) {
-        updateActiveGame(newState.id, { 
-          players: newState.players,
-          isGameOver: newState.isGameOver,
-          winner: newState.winner
-        });
-      }
 
       return newState;
     });
@@ -572,6 +573,27 @@ export default function App() {
               <Timer startTime={gameState.startTime} isPaused={gameState.isGameOver} />
             </div>
           </div>
+
+          {/* Sync Status Indicator */}
+          {gameState.id && (
+            <div className="flex justify-end mb-2 px-4">
+              <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900/50 border border-zinc-800 text-[10px] uppercase tracking-wider font-mono">
+                {isSyncing ? (
+                  <>
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <Cloud className="w-3 h-3 text-emerald-500" />
+                    <span className="text-emerald-500">Syncing...</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-1.5 h-1.5 rounded-full bg-zinc-600" />
+                    <Cloud className="w-3 h-3 text-zinc-600" />
+                    <span className="text-zinc-600">Synced</span>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Players Grid */}
           <div className={`flex-1 grid gap-0.5 ${

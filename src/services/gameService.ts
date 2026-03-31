@@ -1,4 +1,4 @@
-import { collection, doc, setDoc, getDocs, query, orderBy, limit, onSnapshot, deleteDoc, where } from 'firebase/firestore';
+import { collection, doc, setDoc, getDocs, query, orderBy, limit, onSnapshot, deleteDoc, where, updateDoc } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '../firebase.ts';
 import { GameRecord, ActiveGame } from '../types.ts';
 
@@ -12,8 +12,17 @@ export const createActiveGame = async (game: ActiveGame) => {
 
 export const updateActiveGame = async (gameId: string, updates: Partial<ActiveGame>) => {
   try {
-    await setDoc(doc(db, 'active_games', gameId), { ...updates, lastUpdated: Date.now() }, { merge: true });
+    const gameRef = doc(db, 'active_games', gameId);
+    await updateDoc(gameRef, { 
+      ...updates, 
+      lastUpdated: Date.now() 
+    });
   } catch (error) {
+    // If updateDoc fails because the document doesn't exist, we skip it
+    // This can happen if the host exits the game while a guest is making a change
+    if (error instanceof Error && error.message.includes('not-found')) {
+      return;
+    }
     handleFirestoreError(error, OperationType.WRITE, `active_games/${gameId}`);
   }
 };
