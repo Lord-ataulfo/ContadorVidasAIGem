@@ -99,7 +99,7 @@ export default function App() {
   const [isFriendsModalOpen, setIsFriendsModalOpen] = useState(false);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [showLoginSuggestion, setShowLoginSuggestion] = useState(false);
-  const [pendingGameConfig, setPendingGameConfig] = useState<{ type: GameType; playerConfigs: { name: string; color: string; uid?: string }[] } | null>(null);
+  const [pendingGameConfig, setPendingGameConfig] = useState<{ type: GameType; playerConfigs: { name: string; color: string; uid?: string; userCode?: string }[] } | null>(null);
   const isProcessingRemoteUpdate = useRef(false);
 
   useEffect(() => {
@@ -138,6 +138,7 @@ export default function App() {
             startTime: game.startTime,
             isGameOver: game.isGameOver,
             winner: game.winner,
+            hostUid: game.hostUid,
           });
         }
       });
@@ -170,6 +171,7 @@ export default function App() {
               players: remoteGame.players,
               isGameOver: remoteGame.isGameOver,
               winner: remoteGame.winner,
+              hostUid: remoteGame.hostUid,
             };
             
             // Reset the flag after the state update is applied
@@ -191,6 +193,11 @@ export default function App() {
   // Automatic Game Saving
   useEffect(() => {
     if (gameState?.isGameOver && userProfile && gameState.startTime && !gameState.hasBeenSaved) {
+      // Only save if it's a local game (no id) OR if the current user is the host
+      const isHost = !gameState.id || gameState.hostUid === userProfile.uid;
+      
+      if (!isHost) return;
+
       const winner = gameState.winner;
       if (winner) {
         const participantUids = gameState.players
@@ -207,7 +214,8 @@ export default function App() {
             life: p.life,
             color: p.color,
             isEliminated: p.isEliminated,
-            uid: p.uid
+            uid: p.uid,
+            userCode: p.userCode
           })),
           winnerName: winner.name,
           participantUids
@@ -215,10 +223,10 @@ export default function App() {
         
         // Mark as saved immediately to prevent duplicate calls
         setGameState(prev => prev ? { ...prev, hasBeenSaved: true } : null);
-        saveGameRecord(record);
+        saveGameRecord(record, gameState.id);
       }
     }
-  }, [gameState?.isGameOver, userProfile, gameState?.hasBeenSaved]);
+  }, [gameState?.isGameOver, userProfile, gameState?.hasBeenSaved, gameState?.id, gameState?.hostUid]);
 
   const handleLogout = async () => {
     try {
@@ -228,7 +236,7 @@ export default function App() {
     }
   };
 
-  const startGame = (type: GameType, playerConfigs: { name: string; color: string; uid?: string }[]) => {
+  const startGame = (type: GameType, playerConfigs: { name: string; color: string; uid?: string; userCode?: string }[]) => {
     if (!userProfile) {
       setPendingGameConfig({ type, playerConfigs });
       setShowLoginSuggestion(true);
@@ -237,12 +245,13 @@ export default function App() {
     proceedWithGame(type, playerConfigs);
   };
 
-  const proceedWithGame = async (type: GameType, playerConfigs: { name: string; color: string; uid?: string }[]) => {
+  const proceedWithGame = async (type: GameType, playerConfigs: { name: string; color: string; uid?: string; userCode?: string }[]) => {
     const initialLife = type === 'standard' ? 20 : 40;
     const players: Player[] = playerConfigs.map((config, i) => ({
       id: i,
       name: config.name,
       uid: config.uid,
+      userCode: config.userCode,
       life: initialLife,
       color: config.color,
       isEliminated: false,
@@ -261,6 +270,7 @@ export default function App() {
       startTime: Date.now(),
       isGameOver: false,
       winner: null,
+      hostUid: userProfile.uid,
     };
 
     if (gameId) {
@@ -271,6 +281,7 @@ export default function App() {
         isGameOver: false,
         players,
         winner: null,
+        hostUid: userProfile.uid,
         participantUids,
         lastUpdated: Date.now(),
       };
@@ -331,8 +342,8 @@ export default function App() {
 
       const newState = checkGameOver({ ...prev, players: newPlayers });
       
-      // Update Firestore if multiplayer and NOT a remote update
-      if (newState.id && !isProcessingRemoteUpdate.current) {
+      // Update Firestore if multiplayer
+      if (newState.id) {
         updateActiveGame(newState.id, { 
           players: newState.players,
           isGameOver: newState.isGameOver,
@@ -364,7 +375,7 @@ export default function App() {
 
       const newState = checkGameOver({ ...prev, players: newPlayers });
 
-      if (newState.id && !isProcessingRemoteUpdate.current) {
+      if (newState.id) {
         updateActiveGame(newState.id, { 
           players: newState.players,
           isGameOver: newState.isGameOver,
@@ -401,7 +412,7 @@ export default function App() {
 
       const newState = checkGameOver({ ...prev, players: newPlayers });
 
-      if (newState.id && !isProcessingRemoteUpdate.current) {
+      if (newState.id) {
         updateActiveGame(newState.id, { 
           players: newState.players,
           isGameOver: newState.isGameOver,
@@ -418,7 +429,8 @@ export default function App() {
     const playerConfigs = gameState.players.map(p => ({
       name: p.name,
       color: p.color,
-      uid: p.uid
+      uid: p.uid,
+      userCode: p.userCode
     }));
     startGame(gameState.gameType, playerConfigs);
     setShowMenu(false);

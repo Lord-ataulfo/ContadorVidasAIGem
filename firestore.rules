@@ -24,6 +24,30 @@ service cloud.firestore {
     // Fields:
     //   - uid: string (required) - UID associated with the user code
     //
+    // Collection: active_games
+    // Document ID: {gameId}
+    // Fields:
+    //   - id: string
+    //   - gameType: string (standard/commander)
+    //   - startTime: number
+    //   - isGameOver: boolean
+    //   - players: array of objects { id, name, life, poison, commanderDamage, color, isEliminated, uid, userCode }
+    //   - participantUids: array of strings
+    //   - lastUpdated: number
+    //
+    // Collection: history (subcollection of users)
+    // Document ID: {gameId}
+    // Fields:
+    //   - id: string
+    //   - userId: string
+    //   - gameType: string
+    //   - startTime: number
+    //   - endTime: number
+    //   - duration: number
+    //   - players: array of objects { name, life, color, isEliminated, uid, userCode }
+    //   - participantUids: array of strings
+    //   - winnerName: string
+    //
     // ===============================================================
 
     // ===============================================================

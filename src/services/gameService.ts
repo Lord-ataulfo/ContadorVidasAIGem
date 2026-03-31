@@ -53,11 +53,11 @@ export const deleteActiveGame = async (gameId: string) => {
   }
 };
 
-export const saveGameRecord = async (record: Omit<GameRecord, 'id' | 'userId'>) => {
+export const saveGameRecord = async (record: Omit<GameRecord, 'id' | 'userId'>, customId?: string) => {
   const user = auth.currentUser;
   if (!user) return;
 
-  const gameId = doc(collection(db, 'placeholder')).id;
+  const gameId = customId || doc(collection(db, 'placeholder')).id;
   
   try {
     const fullRecord: GameRecord = {

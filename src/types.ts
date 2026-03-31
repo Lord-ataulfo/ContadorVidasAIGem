@@ -26,6 +26,7 @@ export interface GameRecord {
     color: string;
     isEliminated: boolean;
     uid?: string;
+    userCode?: string;
   }[];
   winnerName: string;
   participantUids: string[];
@@ -43,6 +44,7 @@ export interface Player {
   id: number;
   name: string;
   uid?: string;
+  userCode?: string;
   life: number;
   color: string;
   isEliminated: boolean;
@@ -57,6 +59,7 @@ export interface GameState {
   startTime: number | null;
   isGameOver: boolean;
   winner: Player | null;
+  hostUid?: string;
   hasBeenSaved?: boolean;
 }
 
@@ -67,6 +70,7 @@ export interface ActiveGame {
   isGameOver: boolean;
   players: Player[];
   winner: Player | null;
+  hostUid: string;
   participantUids: string[];
   lastUpdated: number;
 }

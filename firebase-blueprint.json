@@ -54,7 +54,9 @@
               "name": { "type": "string" },
               "life": { "type": "number" },
               "color": { "type": "string" },
-              "isEliminated": { "type": "boolean" }
+              "isEliminated": { "type": "boolean" },
+              "uid": { "type": "string" },
+              "userCode": { "type": "string" }
             }
           }
         },
@@ -110,7 +112,8 @@
               "commanderDamage": { "type": "object" },
               "color": { "type": "string" },
               "isEliminated": { "type": "boolean" },
-              "uid": { "type": "string" }
+              "uid": { "type": "string" },
+              "userCode": { "type": "string" }
             }
           }
         },

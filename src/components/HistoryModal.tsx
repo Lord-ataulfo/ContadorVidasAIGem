@@ -136,6 +136,11 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose }) =
                             player.name === record.winnerName ? 'text-emerald-500' : 'text-zinc-400'
                           }`}>
                             {player.name}
+                            {player.userCode && (
+                              <span className="ml-1 opacity-50 font-mono text-[8px]">
+                                {player.userCode}
+                              </span>
+                            )}
                           </p>
                           <p className="text-lg font-mono font-bold text-white">{player.life}</p>
                         </div>

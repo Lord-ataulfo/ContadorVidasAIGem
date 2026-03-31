@@ -27,6 +27,7 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
   const [playerCount, setPlayerCount] = useState(2);
   const [playerNames, setPlayerNames] = useState<string[]>(['', '', '', '', '', '', '', '']);
   const [playerUids, setPlayerUids] = useState<(string | undefined)[]>(Array(8).fill(undefined));
+  const [playerCodes, setPlayerCodes] = useState<(string | undefined)[]>(Array(8).fill(undefined));
   const [errors, setErrors] = useState<(string | null)[]>(Array(8).fill(null));
   const [searchingIndex, setSearchingIndex] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
@@ -37,15 +38,19 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
     if (userProfile && !prevUserRef.current) {
       const newNames = [...playerNames];
       const newUids = [...playerUids];
+      const newCodes = [...playerCodes];
       newNames[0] = userProfile.username;
       newUids[0] = userProfile.uid;
+      newCodes[0] = userProfile.userCode;
       setPlayerNames(newNames);
       setPlayerUids(newUids);
+      setPlayerCodes(newCodes);
     } 
     // If logging out, clear the inputs
     else if (!userProfile && prevUserRef.current) {
       setPlayerNames(['', '', '', '', '', '', '', '']);
       setPlayerUids(Array(8).fill(undefined));
+      setPlayerCodes(Array(8).fill(undefined));
       setErrors(Array(8).fill(null));
       setPlayerCount(2);
       setGameType('standard');
@@ -67,10 +72,13 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
       if (profile) {
         const newNames = [...playerNames];
         const newUids = [...playerUids];
+        const newCodes = [...playerCodes];
         newNames[index] = profile.username;
         newUids[index] = profile.uid;
+        newCodes[index] = profile.userCode;
         setPlayerNames(newNames);
         setPlayerUids(newUids);
+        setPlayerCodes(newCodes);
       } else {
         const updatedErrors = [...errors];
         updatedErrors[index] = "User not found";
@@ -132,8 +140,11 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
     // Clear UID if name is changed and it's not the resolved username
     if (playerUids[index] && name !== playerNames[index]) {
       const newUids = [...playerUids];
+      const newCodes = [...playerCodes];
       newUids[index] = undefined;
+      newCodes[index] = undefined;
       setPlayerUids(newUids);
+      setPlayerCodes(newCodes);
     }
   };
 
@@ -141,6 +152,7 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
     setSearchingIndex(-1); // Global loading state
     const finalNames = [...playerNames];
     const finalUids = [...playerUids];
+    const finalCodes = [...playerCodes];
     const newErrors = [...errors];
     let hasError = false;
 
@@ -152,6 +164,7 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
           if (profile) {
             finalNames[i] = profile.username;
             finalUids[i] = profile.uid;
+            finalCodes[i] = profile.userCode;
             newErrors[i] = null;
           } else {
             newErrors[i] = "User not found";
@@ -175,6 +188,7 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
       name: finalNames[i].trim() || `Player ${i + 1}`,
       color: PLAYER_COLORS[i % PLAYER_COLORS.length],
       uid: finalUids[i],
+      userCode: finalCodes[i],
     }));
     
     setSearchingIndex(null);
