@@ -116,9 +116,9 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose, onSuccess }) => {
                   <input
                     type="text"
                     value={username}
-                    onChange={e => setUsername(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:border-white/20 transition-colors"
-                    placeholder="ejemplo"
+                    onChange={e => setUsername(e.target.value.toUpperCase())}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:border-white/20 transition-colors uppercase font-bold"
+                    placeholder="EJEMPLO"
                     required
                   />
                 </div>

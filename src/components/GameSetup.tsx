@@ -126,8 +126,9 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
   }, [gameType]);
 
   const handleNameChange = (index: number, name: string) => {
+    const upperName = name.toUpperCase();
     const newNames = [...playerNames];
-    newNames[index] = name;
+    newNames[index] = upperName;
     setPlayerNames(newNames);
     
     // Clear error when typing
@@ -138,7 +139,7 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
     }
 
     // Clear UID if name is changed and it's not the resolved username
-    if (playerUids[index] && name !== playerNames[index]) {
+    if (playerUids[index] && upperName !== playerNames[index]) {
       const newUids = [...playerUids];
       const newCodes = [...playerCodes];
       newUids[index] = undefined;
@@ -325,10 +326,10 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
                   <div className="flex-1 relative">
                     <input
                       type="text"
-                      placeholder={i === 0 ? "Your Name" : `Player ${i + 1} or #CODE`}
+                      placeholder={i === 0 ? "YOUR NAME" : `PLAYER ${i + 1} OR #CODE`}
                       value={playerNames[i]}
                       onChange={(e) => handleNameChange(i, e.target.value)}
-                      className={`w-full bg-zinc-950 border rounded-xl px-4 py-2 text-sm focus:outline-none transition-colors pr-10 ${
+                      className={`w-full bg-zinc-950 border rounded-xl px-4 py-2 text-sm focus:outline-none transition-colors pr-10 uppercase font-bold ${
                         errors[i] ? 'border-red-500 focus:border-red-500' : 'border-zinc-800 focus:border-zinc-600'
                       }`}
                     />

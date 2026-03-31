@@ -32,8 +32,9 @@ const generateUserCode = () => {
 
 export const registerUser = async (email: string, password: string, username: string): Promise<UserProfile> => {
   try {
+    const upperUsername = username.toUpperCase();
     // 1. Check if username is already taken (client-side check for better UX)
-    const usernameDoc = await getDoc(doc(db, USERNAMES_COLLECTION, username.toLowerCase()));
+    const usernameDoc = await getDoc(doc(db, USERNAMES_COLLECTION, upperUsername.toLowerCase()));
     if (usernameDoc.exists()) {
       throw new Error('Username is already taken.');
     }
@@ -56,7 +57,7 @@ export const registerUser = async (email: string, password: string, username: st
 
     const userProfile: UserProfile = {
       uid: user.uid,
-      username: username,
+      username: upperUsername,
       email: email,
       userCode: userCode,
       createdAt: new Date().toISOString(),
@@ -65,14 +66,14 @@ export const registerUser = async (email: string, password: string, username: st
 
     const userPublic = {
       uid: user.uid,
-      username: username,
+      username: upperUsername,
       userCode: userCode
     };
 
     // 4. Use a transaction to ensure atomicity and uniqueness
     await runTransaction(db, async (transaction) => {
       // Re-check username in transaction
-      const usernameRef = doc(db, USERNAMES_COLLECTION, username.toLowerCase());
+      const usernameRef = doc(db, USERNAMES_COLLECTION, upperUsername.toLowerCase());
       const usernameSnap = await transaction.get(usernameRef);
       if (usernameSnap.exists()) {
         throw new Error('Username is already taken.');
@@ -130,7 +131,7 @@ export const signInWithGoogle = async (): Promise<UserProfile> => {
     }
 
     // New user from Google - need to create profile
-    let baseUsername = user.displayName || `User_${user.uid.substring(0, 5)}`;
+    let baseUsername = (user.displayName || `USER_${user.uid.substring(0, 5)}`).toUpperCase();
     if (baseUsername.length > 50) baseUsername = baseUsername.substring(0, 50);
     
     // Ensure unique username for Google users
