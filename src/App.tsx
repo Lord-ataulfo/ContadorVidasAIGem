@@ -147,18 +147,22 @@ export default function App() {
     }
   }, [isAuthReady, userProfile, !!gameState]);
 
-  // Listen to current active game
+  // Sincronización en tiempo real: Escucha cambios en la partida activa desde Firestore
   useEffect(() => {
     if (gameState?.id) {
+      // Suscribirse a los cambios del documento de la partida en Firestore
       const unsubscribe = listenToActiveGame(gameState.id, (remoteGame) => {
         if (remoteGame) {
+          // Serializar el estado remoto para compararlo con el local
           const remoteStateStr = JSON.stringify({
             players: remoteGame.players,
             isGameOver: remoteGame.isGameOver,
             winner: remoteGame.winner
           });
 
-          // Update our "last known server state" ref to avoid echoing it back
+          // CAMBIO: Actualizamos la referencia ANTES de actualizar el estado local
+          // Esto es crucial para que el efecto de sincronización (sync effect) sepa
+          // que este cambio viene del servidor y no lo vuelva a subir.
           lastServerState.current = remoteStateStr;
 
           setGameState(prev => {
@@ -170,11 +174,13 @@ export default function App() {
               winner: prev.winner
             });
 
-            // Only update if there's an actual change to avoid unnecessary re-renders
+            // Si el estado local ya es igual al remoto, no hacemos nada para evitar re-renders innecesarios
             if (currentStateStr === remoteStateStr) {
               return prev;
             }
 
+            // COMENTARIO: Aquí es donde el host recibe los cambios de los invitados
+            // y los invitados reciben los cambios del host.
             return {
               ...prev,
               players: remoteGame.players,
@@ -184,7 +190,7 @@ export default function App() {
             };
           });
         } else if (gameState && !gameState.isGameOver) {
-          // Game was deleted by someone else (likely the host)
+          // Si el documento desaparece y el juego no ha terminado, volvemos al inicio
           setGameState(null);
         }
       });
@@ -192,7 +198,7 @@ export default function App() {
     }
   }, [gameState?.id]);
 
-  // Sync local changes to Firestore
+  // Sincronización en tiempo real: Sube los cambios locales a Firestore
   useEffect(() => {
     if (gameState?.id) {
       const currentStateStr = JSON.stringify({
@@ -201,9 +207,16 @@ export default function App() {
         winner: gameState.winner
       });
 
-      // Only sync if the current state is different from the last state we got from the server
+      // COMENTARIO: Solo subimos a Firestore si el cambio es LOCAL
+      // (es decir, si el estado actual es diferente al último que recibimos del servidor)
       if (currentStateStr !== lastServerState.current) {
         setIsSyncing(true);
+        
+        // Marcamos este estado como el último sincronizado ANTES de la llamada
+        // para evitar que cambios rápidos disparen múltiples actualizaciones.
+        lastServerState.current = currentStateStr;
+
+        // Actualizamos el documento en Firestore para que todos los participantes lo vean
         updateActiveGame(gameState.id, {
           players: gameState.players,
           isGameOver: gameState.isGameOver,
@@ -211,8 +224,6 @@ export default function App() {
         }).finally(() => {
           setIsSyncing(false);
         });
-        // Update the ref so we don't sync the same thing again
-        lastServerState.current = currentStateStr;
       }
     }
   }, [gameState]);
