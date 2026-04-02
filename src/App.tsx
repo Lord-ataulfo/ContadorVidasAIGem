@@ -138,6 +138,13 @@ export default function App() {
           // Marcamos como actualización remota para evitar subir el estado inicial
           isProcessingRemoteUpdate.current = true;
           
+          const initialStateStr = JSON.stringify({
+            players: game.players.map(p => JSON.parse(JSON.stringify(p, Object.keys(p).sort()))),
+            isGameOver: game.isGameOver,
+            winner: game.winner ? JSON.parse(JSON.stringify(game.winner, Object.keys(game.winner).sort())) : null
+          });
+          lastServerState.current = initialStateStr;
+          
           setGameState({
             id: game.id,
             gameType: game.gameType,
@@ -160,20 +167,22 @@ export default function App() {
       // Suscribirse a los cambios del documento de la partida en Firestore
       const unsubscribe = listenToActiveGame(gameState.id, (remoteGame) => {
         if (remoteGame) {
-          // Serializar el estado remoto para compararlo con el local
+          // Función para normalizar objetos y comparar sin importar el orden de las claves
+          const normalize = (obj: any) => JSON.stringify(obj, Object.keys(obj).sort());
+          
           const remoteStateStr = JSON.stringify({
-            players: remoteGame.players,
+            players: remoteGame.players.map(p => JSON.parse(normalize(p))),
             isGameOver: remoteGame.isGameOver,
-            winner: remoteGame.winner
+            winner: remoteGame.winner ? JSON.parse(normalize(remoteGame.winner)) : null
           });
 
           setGameState(prev => {
             if (!prev) return null;
             
             const currentStateStr = JSON.stringify({
-              players: prev.players,
+              players: prev.players.map(p => JSON.parse(normalize(p))),
               isGameOver: prev.isGameOver,
-              winner: prev.winner
+              winner: prev.winner ? JSON.parse(normalize(prev.winner)) : null
             });
 
             // Si el estado local ya es igual al remoto, no hacemos nada
@@ -181,7 +190,7 @@ export default function App() {
               return prev;
             }
 
-            console.log("Actualización remota recibida:", remoteStateStr);
+            console.log("Actualización remota recibida y aplicada:", remoteStateStr);
             // Marcamos que esta actualización viene del servidor para que el sync effect no la devuelva
             isProcessingRemoteUpdate.current = true;
             lastServerState.current = remoteStateStr;
@@ -214,10 +223,13 @@ export default function App() {
       return;
     }
 
+    // Función para normalizar objetos y comparar sin importar el orden de las claves
+    const normalize = (obj: any) => JSON.stringify(obj, Object.keys(obj).sort());
+
     const currentStateStr = JSON.stringify({
-      players: gameState.players,
+      players: gameState.players.map(p => JSON.parse(normalize(p))),
       isGameOver: gameState.isGameOver,
-      winner: gameState.winner
+      winner: gameState.winner ? JSON.parse(normalize(gameState.winner)) : null
     });
 
     // Solo subimos a Firestore si el cambio es LOCAL y diferente a lo último que sabemos del servidor
@@ -331,6 +343,13 @@ export default function App() {
         participantUids,
         lastUpdated: Date.now(),
       };
+      const normalize = (obj: any) => JSON.stringify(obj, Object.keys(obj).sort());
+      lastServerState.current = JSON.stringify({
+        players: players.map(p => JSON.parse(normalize(p))),
+        isGameOver: false,
+        winner: null
+      });
+      
       await createActiveGame(activeGame);
     }
 

@@ -12,12 +12,15 @@ export const createActiveGame = async (game: ActiveGame) => {
 
 export const updateActiveGame = async (gameId: string, updates: Partial<ActiveGame>) => {
   try {
+    console.log(`Intentando actualizar partida ${gameId}:`, updates);
     const gameRef = doc(db, 'active_games', gameId);
     await updateDoc(gameRef, { 
       ...updates, 
       lastUpdated: Date.now() 
     });
+    console.log(`Partida ${gameId} actualizada con éxito.`);
   } catch (error) {
+    console.error(`Error al actualizar partida ${gameId}:`, error);
     // If updateDoc fails because the document doesn't exist, we skip it
     // This can happen if the host exits the game while a guest is making a change
     if (error instanceof Error && error.message.includes('not-found')) {
