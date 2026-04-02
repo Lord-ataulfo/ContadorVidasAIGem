@@ -101,6 +101,7 @@ export default function App() {
   const [showLoginSuggestion, setShowLoginSuggestion] = useState(false);
   const [pendingGameConfig, setPendingGameConfig] = useState<{ type: GameType; playerConfigs: { name: string; color: string; uid?: string; userCode?: string }[] } | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const isProcessingRemoteUpdate = useRef(false);
   const lastServerState = useRef<string | null>(null);
 
   useEffect(() => {
@@ -132,6 +133,11 @@ export default function App() {
       const unsubscribe = listenForInvites(userProfile.uid, (games) => {
         if (games.length > 0) {
           const game = games[0];
+          console.log("Invitación recibida, uniéndose a la partida:", game.id);
+          
+          // Marcamos como actualización remota para evitar subir el estado inicial
+          isProcessingRemoteUpdate.current = true;
+          
           setGameState({
             id: game.id,
             gameType: game.gameType,
@@ -150,6 +156,7 @@ export default function App() {
   // Sincronización en tiempo real: Escucha cambios en la partida activa desde Firestore
   useEffect(() => {
     if (gameState?.id) {
+      console.log("Iniciando escucha de partida activa:", gameState.id);
       // Suscribirse a los cambios del documento de la partida en Firestore
       const unsubscribe = listenToActiveGame(gameState.id, (remoteGame) => {
         if (remoteGame) {
@@ -160,11 +167,6 @@ export default function App() {
             winner: remoteGame.winner
           });
 
-          // CAMBIO: Actualizamos la referencia ANTES de actualizar el estado local
-          // Esto es crucial para que el efecto de sincronización (sync effect) sepa
-          // que este cambio viene del servidor y no lo vuelva a subir.
-          lastServerState.current = remoteStateStr;
-
           setGameState(prev => {
             if (!prev) return null;
             
@@ -174,13 +176,16 @@ export default function App() {
               winner: prev.winner
             });
 
-            // Si el estado local ya es igual al remoto, no hacemos nada para evitar re-renders innecesarios
+            // Si el estado local ya es igual al remoto, no hacemos nada
             if (currentStateStr === remoteStateStr) {
               return prev;
             }
 
-            // COMENTARIO: Aquí es donde el host recibe los cambios de los invitados
-            // y los invitados reciben los cambios del host.
+            console.log("Actualización remota recibida:", remoteStateStr);
+            // Marcamos que esta actualización viene del servidor para que el sync effect no la devuelva
+            isProcessingRemoteUpdate.current = true;
+            lastServerState.current = remoteStateStr;
+            
             return {
               ...prev,
               players: remoteGame.players,
@@ -200,31 +205,34 @@ export default function App() {
 
   // Sincronización en tiempo real: Sube los cambios locales a Firestore
   useEffect(() => {
-    if (gameState?.id) {
-      const currentStateStr = JSON.stringify({
+    if (!gameState?.id) return;
+
+    // Si este cambio de estado vino de una actualización remota, NO lo sincronizamos de vuelta
+    if (isProcessingRemoteUpdate.current) {
+      console.log("Omitiendo sincronización: el cambio vino del servidor");
+      isProcessingRemoteUpdate.current = false;
+      return;
+    }
+
+    const currentStateStr = JSON.stringify({
+      players: gameState.players,
+      isGameOver: gameState.isGameOver,
+      winner: gameState.winner
+    });
+
+    // Solo subimos a Firestore si el cambio es LOCAL y diferente a lo último que sabemos del servidor
+    if (currentStateStr !== lastServerState.current) {
+      setIsSyncing(true);
+      console.log("Sincronizando cambio local a Firestore:", currentStateStr);
+      lastServerState.current = currentStateStr;
+      
+      updateActiveGame(gameState.id, {
         players: gameState.players,
         isGameOver: gameState.isGameOver,
         winner: gameState.winner
+      }).finally(() => {
+        setIsSyncing(false);
       });
-
-      // COMENTARIO: Solo subimos a Firestore si el cambio es LOCAL
-      // (es decir, si el estado actual es diferente al último que recibimos del servidor)
-      if (currentStateStr !== lastServerState.current) {
-        setIsSyncing(true);
-        
-        // Marcamos este estado como el último sincronizado ANTES de la llamada
-        // para evitar que cambios rápidos disparen múltiples actualizaciones.
-        lastServerState.current = currentStateStr;
-
-        // Actualizamos el documento en Firestore para que todos los participantes lo vean
-        updateActiveGame(gameState.id, {
-          players: gameState.players,
-          isGameOver: gameState.isGameOver,
-          winner: gameState.winner
-        }).finally(() => {
-          setIsSyncing(false);
-        });
-      }
     }
   }, [gameState]);
 
