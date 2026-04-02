@@ -101,6 +101,7 @@ export default function App() {
   const [showLoginSuggestion, setShowLoginSuggestion] = useState(false);
   const [pendingGameConfig, setPendingGameConfig] = useState<{ type: GameType; playerConfigs: { name: string; color: string; uid?: string; userCode?: string }[] } | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [lastRemoteUpdate, setLastRemoteUpdate] = useState<number | null>(null);
   const isProcessingRemoteUpdate = useRef(false);
   const lastServerState = useRef<string | null>(null);
 
@@ -194,6 +195,7 @@ export default function App() {
             // Marcamos que esta actualización viene del servidor para que el sync effect no la devuelva
             isProcessingRemoteUpdate.current = true;
             lastServerState.current = remoteStateStr;
+            setLastRemoteUpdate(Date.now());
             
             return {
               ...prev,
@@ -211,6 +213,14 @@ export default function App() {
       return () => unsubscribe();
     }
   }, [gameState?.id]);
+
+  // Limpiar el indicador de actualización remota después de unos segundos
+  useEffect(() => {
+    if (lastRemoteUpdate) {
+      const timer = setTimeout(() => setLastRemoteUpdate(null), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [lastRemoteUpdate]);
 
   // Sincronización en tiempo real: Sube los cambios locales a Firestore
   useEffect(() => {
@@ -621,6 +631,12 @@ export default function App() {
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                     <Cloud className="w-3 h-3 text-emerald-500" />
                     <span className="text-emerald-500">Syncing...</span>
+                  </>
+                ) : lastRemoteUpdate ? (
+                  <>
+                    <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                    <RefreshCw className="w-3 h-3 text-amber-500 animate-spin" />
+                    <span className="text-amber-500">Remote Update</span>
                   </>
                 ) : (
                   <>
