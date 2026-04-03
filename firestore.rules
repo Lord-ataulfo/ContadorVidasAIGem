@@ -74,22 +74,20 @@ service cloud.firestore {
     }
 
     function isValidUser(data) {
-      return data.keys().hasAll(['uid', 'username', 'email', 'userCode', 'createdAt', 'provider']) &&
-             data.keys().hasOnly(['uid', 'username', 'email', 'userCode', 'createdAt', 'role', 'provider']) &&
+      return data.keys().hasAll(['uid', 'username', 'email', 'userCode']) &&
              data.uid is string && data.uid == request.auth.uid &&
              data.username is string && data.username.size() >= 3 && data.username.size() <= 50 &&
              data.email is string && isValidEmail(data.email) &&
              data.userCode is string && data.userCode.size() == 7 &&
-             data.createdAt is string &&
-             data.provider in ['google', 'email'];
+             (!('photoURL' in data) || data.photoURL == null || (data.photoURL is string && data.photoURL.size() < 1000000));
     }
 
     function isValidUserPublic(data) {
       return data.keys().hasAll(['uid', 'username', 'userCode']) &&
-             data.keys().hasOnly(['uid', 'username', 'userCode']) &&
              data.uid is string && data.uid == request.auth.uid &&
              data.username is string && data.username.size() >= 3 && data.username.size() <= 50 &&
-             data.userCode is string && data.userCode.size() == 7;
+             data.userCode is string && data.userCode.size() == 7 &&
+             (!('photoURL' in data) || data.photoURL == null || (data.photoURL is string && data.photoURL.size() < 1000000));
     }
 
     function isValidGameRecord(data) {

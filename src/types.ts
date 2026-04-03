@@ -10,6 +10,7 @@ export interface UserProfile {
   email: string;
   userCode: string;
   createdAt: string;
+  photoURL?: string;
   provider?: 'google' | 'email';
 }
 
@@ -47,6 +48,7 @@ export interface Player {
   userCode?: string;
   life: number;
   color: string;
+  photoURL?: string;
   isEliminated: boolean;
   commanderDamage: CommanderDamage;
   poisonDamage: number;

@@ -56,15 +56,15 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
       }`}
       style={{ backgroundColor: player.color }}
     >
-      {/* Background Image - Wolf-themed fantasy art */}
+      {/* Background Image - User photo or Wolf-themed fantasy art */}
       <div className="absolute inset-0 z-0">
         <img 
-          src={`https://images.unsplash.com/photo-${['1590420485404-f86d22b8abf8', '1557008075-7f2c5efa4cfd', '1551028150-64b9f398f678', '1590420485404-f86d22b8abf8', '1557008075-7f2c5efa4cfd', '1551028150-64b9f398f678', '1590420485404-f86d22b8abf8', '1557008075-7f2c5efa4cfd'][player.id % 8]}?auto=format&fit=crop&q=80&w=800`}
+          src={player.photoURL || `https://images.unsplash.com/photo-${['1590420485404-f86d22b8abf8', '1557008075-7f2c5efa4cfd', '1551028150-64b9f398f678', '1590420485404-f86d22b8abf8', '1557008075-7f2c5efa4cfd', '1551028150-64b9f398f678', '1590420485404-f86d22b8abf8', '1557008075-7f2c5efa4cfd'][player.id % 8]}?auto=format&fit=crop&q=80&w=800`}
           alt=""
-          className="w-full h-full object-cover opacity-40 mix-blend-multiply"
+          className={`w-full h-full object-cover ${player.photoURL ? 'opacity-50' : 'opacity-40'} mix-blend-overlay`}
           referrerPolicy="no-referrer"
         />
-        <div className="absolute inset-0 bg-black/20" />
+        <div className={`absolute inset-0 ${player.photoURL ? 'bg-black/40' : 'bg-black/20'}`} />
       </div>
 
       {/* Background Pattern */}
@@ -73,9 +73,21 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
       </div>
 
       <div className="z-10 flex flex-col items-center gap-2 w-full max-w-[200px]">
-        <span className="text-sm font-serif font-bold uppercase tracking-widest opacity-90 drop-shadow-lg">
-          {player.name}
-        </span>
+        <div className="flex flex-col items-center gap-1">
+          {player.photoURL && (
+            <div className="w-12 h-12 rounded-full border-2 border-white/20 overflow-hidden shadow-lg mb-1">
+              <img 
+                src={player.photoURL} 
+                alt={player.name} 
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+            </div>
+          )}
+          <span className="text-sm font-serif font-bold uppercase tracking-widest opacity-90 drop-shadow-lg">
+            {player.name}
+          </span>
+        </div>
 
         <div className="relative flex items-center justify-center w-full">
           <AnimatePresence mode="popLayout">

@@ -10,6 +10,7 @@ import LoginModal from './components/LoginModal.tsx';
 import { Navigation } from './components/Navigation.tsx';
 import { HistoryModal } from './components/HistoryModal.tsx';
 import { FriendsModal } from './components/FriendsModal.tsx';
+import { ProfileModal } from './components/ProfileModal.tsx';
 import { LoginSuggestionModal } from './components/LoginSuggestionModal.tsx';
 import { motion, AnimatePresence } from 'motion/react';
 import { subscribeToAuthChanges, getUserProfile, logoutUser } from './services/authService.ts';
@@ -97,6 +98,7 @@ export default function App() {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [isFriendsModalOpen, setIsFriendsModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [showLoginSuggestion, setShowLoginSuggestion] = useState(false);
   const [activeGameError, setActiveGameError] = useState<string | null>(null);
@@ -357,7 +359,7 @@ export default function App() {
     }
   };
 
-  const startGame = (type: GameType, playerConfigs: { name: string; color: string; uid?: string; userCode?: string }[]) => {
+  const startGame = (type: GameType, playerConfigs: { name: string; color: string; uid?: string; userCode?: string; photoURL?: string }[]) => {
     if (gameState && !gameState.isGameOver) {
       setActiveGameError("You are already in an active game. Please finish or leave it first.");
       return;
@@ -370,7 +372,7 @@ export default function App() {
     proceedWithGame(type, playerConfigs);
   };
 
-  const proceedWithGame = async (type: GameType, playerConfigs: { name: string; color: string; uid?: string; userCode?: string }[]) => {
+  const proceedWithGame = async (type: GameType, playerConfigs: { name: string; color: string; uid?: string; userCode?: string; photoURL?: string }[]) => {
     const initialLife = type === 'standard' ? 20 : 40;
     const players: Player[] = playerConfigs.map((config, i) => ({
       id: i,
@@ -379,6 +381,7 @@ export default function App() {
       userCode: config.userCode,
       life: initialLife,
       color: config.color,
+      photoURL: config.photoURL,
       isEliminated: false,
       commanderDamage: {},
       poisonDamage: 0,
@@ -608,6 +611,7 @@ export default function App() {
             onLogoutClick={handleLogout}
             onHistoryClick={() => setIsHistoryModalOpen(true)}
             onFriendsClick={() => setIsFriendsModalOpen(true)}
+            onProfileClick={() => setIsProfileModalOpen(true)}
             onHomeClick={exitToHome}
           />
           <main className="lg:pl-20 pt-16 lg:pt-0 min-h-screen bg-transparent">
@@ -640,6 +644,15 @@ export default function App() {
             isOpen={isFriendsModalOpen}
             onClose={() => setIsFriendsModalOpen(false)}
           />
+          <AnimatePresence>
+            {isProfileModalOpen && userProfile && (
+              <ProfileModal 
+                userProfile={userProfile} 
+                onClose={() => setIsProfileModalOpen(false)}
+                onUpdate={(updated) => setUserProfile(updated)}
+              />
+            )}
+          </AnimatePresence>
           <LoginSuggestionModal
             isOpen={showLoginSuggestion}
             onClose={() => setShowLoginSuggestion(false)}
@@ -669,6 +682,7 @@ export default function App() {
           onLogoutClick={handleLogout}
           onHistoryClick={() => setIsHistoryModalOpen(true)}
           onFriendsClick={() => setIsFriendsModalOpen(true)}
+          onProfileClick={() => setIsProfileModalOpen(true)}
           onHomeClick={exitToHome}
           isInGame={!!gameState && !gameState.isGameOver}
           onLeaveGame={handleLeaveGame}
@@ -859,6 +873,16 @@ export default function App() {
           )}
         </AnimatePresence>
         
+        <AnimatePresence>
+          {isProfileModalOpen && userProfile && (
+            <ProfileModal 
+              userProfile={userProfile} 
+              onClose={() => setIsProfileModalOpen(false)}
+              onUpdate={(updated) => setUserProfile(updated)}
+            />
+          )}
+        </AnimatePresence>
+
         <HistoryModal
           isOpen={isHistoryModalOpen}
           onClose={() => setIsHistoryModalOpen(false)}

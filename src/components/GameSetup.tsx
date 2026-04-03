@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { getUserByCode } from '../services/authService.ts';
 
 interface GameSetupProps {
-  onStart: (type: GameType, players: { name: string; color: string; uid?: string }[]) => void;
+  onStart: (type: GameType, players: { name: string; color: string; uid?: string; userCode?: string; photoURL?: string }[]) => void;
   userProfile: UserProfile | null;
   onLoginClick: () => void;
   onLogoutClick: () => void;
@@ -28,6 +28,7 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
   const [playerNames, setPlayerNames] = useState<string[]>(['', '', '', '', '', '', '', '']);
   const [playerUids, setPlayerUids] = useState<(string | undefined)[]>(Array(8).fill(undefined));
   const [playerCodes, setPlayerCodes] = useState<(string | undefined)[]>(Array(8).fill(undefined));
+  const [playerPhotos, setPlayerPhotos] = useState<(string | undefined)[]>(Array(8).fill(undefined));
   const [errors, setErrors] = useState<(string | null)[]>(Array(8).fill(null));
   const [searchingIndex, setSearchingIndex] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
@@ -59,10 +60,19 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
         }
         return prev;
       });
+      setPlayerPhotos(prev => {
+        const newPhotos = [...prev];
+        if (newPhotos[0] !== userProfile.photoURL) {
+          newPhotos[0] = userProfile.photoURL;
+          return newPhotos;
+        }
+        return prev;
+      });
     } else {
       setPlayerNames(['', '', '', '', '', '', '', '']);
       setPlayerUids(Array(8).fill(undefined));
       setPlayerCodes(Array(8).fill(undefined));
+      setPlayerPhotos(Array(8).fill(undefined));
       setErrors(Array(8).fill(null));
       setPlayerCount(2);
       setGameType('standard');
@@ -85,12 +95,15 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
         const newNames = [...playerNames];
         const newUids = [...playerUids];
         const newCodes = [...playerCodes];
+        const newPhotos = [...playerPhotos];
         newNames[index] = profile.username;
         newUids[index] = profile.uid;
         newCodes[index] = profile.userCode;
+        newPhotos[index] = profile.photoURL;
         setPlayerNames(newNames);
         setPlayerUids(newUids);
         setPlayerCodes(newCodes);
+        setPlayerPhotos(newPhotos);
       } else {
         const updatedErrors = [...errors];
         updatedErrors[index] = "User not found";
@@ -154,10 +167,13 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
     if (playerUids[index] && upperName !== playerNames[index]) {
       const newUids = [...playerUids];
       const newCodes = [...playerCodes];
+      const newPhotos = [...playerPhotos];
       newUids[index] = undefined;
       newCodes[index] = undefined;
+      newPhotos[index] = undefined;
       setPlayerUids(newUids);
       setPlayerCodes(newCodes);
+      setPlayerPhotos(newPhotos);
     }
   };
 
@@ -166,6 +182,7 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
     const finalNames = [...playerNames];
     const finalUids = [...playerUids];
     const finalCodes = [...playerCodes];
+    const finalPhotos = [...playerPhotos];
     const newErrors = [...errors];
     let hasError = false;
 
@@ -178,6 +195,7 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
             finalNames[i] = profile.username;
             finalUids[i] = profile.uid;
             finalCodes[i] = profile.userCode;
+            finalPhotos[i] = profile.photoURL;
             newErrors[i] = null;
           } else {
             newErrors[i] = "User not found";
@@ -202,6 +220,7 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
       color: PLAYER_COLORS[i % PLAYER_COLORS.length],
       uid: finalUids[i],
       userCode: finalCodes[i],
+      photoURL: finalPhotos[i],
     }));
     
     setSearchingIndex(null);

@@ -11,6 +11,7 @@ import {
   doc, 
   getDoc, 
   setDoc, 
+  updateDoc,
   runTransaction,
 } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../firebase.ts';
@@ -67,7 +68,8 @@ export const registerUser = async (email: string, password: string, username: st
     const userPublic = {
       uid: user.uid,
       username: upperUsername,
-      userCode: userCode
+      userCode: userCode,
+      photoURL: ''
     };
 
     // 4. Use a transaction to ensure atomicity and uniqueness
@@ -175,7 +177,8 @@ export const signInWithGoogle = async (): Promise<UserProfile> => {
     const userPublic = {
       uid: user.uid,
       username: finalUsername,
-      userCode: userCode
+      userCode: userCode,
+      photoURL: ''
     };
 
     // Use a transaction to ensure atomicity and uniqueness
@@ -226,11 +229,11 @@ export const getUserProfile = async (uid: string): Promise<UserProfile | null> =
   }
 };
 
-export const getPublicProfile = async (uid: string): Promise<{ uid: string; username: string; userCode: string } | null> => {
+export const getPublicProfile = async (uid: string): Promise<{ uid: string; username: string; userCode: string; photoURL?: string } | null> => {
   try {
     const userDoc = await getDoc(doc(db, 'users_public', uid));
     if (userDoc.exists()) {
-      return userDoc.data() as { uid: string; username: string; userCode: string };
+      return userDoc.data() as { uid: string; username: string; userCode: string; photoURL?: string };
     }
     return null;
   } catch (error) {
@@ -239,7 +242,7 @@ export const getPublicProfile = async (uid: string): Promise<{ uid: string; user
   }
 };
 
-export const getUserByCode = async (userCode: string): Promise<{ uid: string; username: string; userCode: string } | null> => {
+export const getUserByCode = async (userCode: string): Promise<{ uid: string; username: string; userCode: string; photoURL?: string } | null> => {
   try {
     // Ensure the code starts with # and is uppercase
     const formattedCode = userCode.startsWith('#') ? userCode.toUpperCase() : `#${userCode.toUpperCase()}`;
@@ -253,6 +256,16 @@ export const getUserByCode = async (userCode: string): Promise<{ uid: string; us
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, USER_CODES_COLLECTION);
     return null;
+  }
+};
+
+export const updateUserProfilePhoto = async (uid: string, photoURL: string | null): Promise<void> => {
+  try {
+    await updateDoc(doc(db, USERS_COLLECTION, uid), { photoURL });
+    await updateDoc(doc(db, 'users_public', uid), { photoURL });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, USERS_COLLECTION);
+    throw error;
   }
 };
 
