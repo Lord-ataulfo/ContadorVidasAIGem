@@ -163,10 +163,11 @@ export default function App() {
 
   // Sincronización en tiempo real: Escucha cambios en la partida activa desde Firestore
   useEffect(() => {
-    if (gameState?.id) {
-      console.log("Iniciando escucha de partida activa:", gameState.id);
+    const gameId = gameState?.id;
+    if (gameId) {
+      console.log("Iniciando escucha de partida activa:", gameId);
       // Suscribirse a los cambios del documento de la partida en Firestore
-      const unsubscribe = listenToActiveGame(gameState.id, (remoteGame) => {
+      const unsubscribe = listenToActiveGame(gameId, (remoteGame) => {
         if (remoteGame) {
           // Función para normalizar objetos y comparar sin importar el orden de las claves
           const normalize = (obj: any) => JSON.stringify(obj, Object.keys(obj).sort());
@@ -178,7 +179,8 @@ export default function App() {
           });
 
           setGameState(prev => {
-            if (!prev) return null;
+            // Si no hay estado previo o el ID no coincide, ignoramos
+            if (!prev || prev.id !== gameId) return prev;
             
             const currentStateStr = JSON.stringify({
               players: prev.players.map(p => JSON.parse(normalize(p))),
@@ -205,12 +207,16 @@ export default function App() {
               hostUid: remoteGame.hostUid,
             };
           });
-        } else if (gameState && !gameState.isGameOver) {
+        } else if (gameState && !gameState.isGameOver && gameState.id === gameId) {
           // Si el documento desaparece y el juego no ha terminado, volvemos al inicio
+          // Pero solo si el ID coincide con el que estamos escuchando
           setGameState(null);
         }
       });
-      return () => unsubscribe();
+      return () => {
+        console.log("Limpiando escucha de partida:", gameId);
+        unsubscribe();
+      };
     }
   }, [gameState?.id]);
 
@@ -353,12 +359,17 @@ export default function App() {
         participantUids,
         lastUpdated: Date.now(),
       };
+      
+      // Inicializar el estado del servidor ANTES de crear la partida y setear el estado
       const normalize = (obj: any) => JSON.stringify(obj, Object.keys(obj).sort());
-      lastServerState.current = JSON.stringify({
+      const initialStateStr = JSON.stringify({
         players: players.map(p => JSON.parse(normalize(p))),
         isGameOver: false,
         winner: null
       });
+      
+      lastServerState.current = initialStateStr;
+      isProcessingRemoteUpdate.current = false;
       
       await createActiveGame(activeGame);
     }
