@@ -13,6 +13,8 @@ interface NavigationProps {
   onHistoryClick: () => void;
   onFriendsClick: () => void;
   onHomeClick: () => void;
+  onLeaveGame?: () => void;
+  isInGame?: boolean;
 }
 
 export const Navigation: React.FC<NavigationProps> = ({
@@ -21,7 +23,9 @@ export const Navigation: React.FC<NavigationProps> = ({
   onLogoutClick,
   onHistoryClick,
   onFriendsClick,
-  onHomeClick
+  onHomeClick,
+  onLeaveGame,
+  isInGame
 }) => {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -29,6 +33,7 @@ export const Navigation: React.FC<NavigationProps> = ({
     { id: 'home', label: 'Home', icon: Home, onClick: onHomeClick, show: true },
     { id: 'history', label: 'History', icon: History, onClick: onHistoryClick, show: !!userProfile },
     { id: 'friends', label: 'Friends', icon: Users, onClick: onFriendsClick, show: !!userProfile },
+    { id: 'leave', label: 'Leave Game', icon: LogOut, onClick: onLeaveGame || (() => {}), show: !!isInGame && !!onLeaveGame },
   ];
 
   const handleItemClick = (onClick: () => void) => {

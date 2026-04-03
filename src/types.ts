@@ -61,6 +61,8 @@ export interface GameState {
   winner: Player | null;
   hostUid?: string;
   hasBeenSaved?: boolean;
+  lastLifeChangeTimestamp?: number;
+  isTimeout?: boolean;
 }
 
 export interface ActiveGame {
@@ -73,4 +75,5 @@ export interface ActiveGame {
   hostUid: string;
   participantUids: string[];
   lastUpdated: number;
+  lastLifeChangeTimestamp: number;
 }

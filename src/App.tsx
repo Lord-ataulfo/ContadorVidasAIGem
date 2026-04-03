@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useState, useCallback, useEffect, ErrorInfo, ReactNode, useRef } from 'react';
-import { Menu, RotateCcw, Home, Trophy, AlertTriangle, RefreshCw, LogOut, LogIn, Cloud, CloudOff } from 'lucide-react';
+import { Menu, RotateCcw, Home, Trophy, AlertTriangle, RefreshCw, LogOut, LogIn, Cloud, CloudOff, X } from 'lucide-react';
 import { GameType, Player, GameState, UserProfile } from './types';
 import GameSetup from './components/GameSetup.tsx';
 import PlayerCard from './components/PlayerCard.tsx';
@@ -99,6 +99,7 @@ export default function App() {
   const [isFriendsModalOpen, setIsFriendsModalOpen] = useState(false);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [showLoginSuggestion, setShowLoginSuggestion] = useState(false);
+  const [activeGameError, setActiveGameError] = useState<string | null>(null);
   const [pendingGameConfig, setPendingGameConfig] = useState<{ type: GameType; playerConfigs: { name: string; color: string; uid?: string; userCode?: string }[] } | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastRemoteUpdate, setLastRemoteUpdate] = useState<number | null>(null);
@@ -128,21 +129,33 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Listen for invites when at home
+  // Listen for invites when at home or in a finished game
   useEffect(() => {
-    if (isAuthReady && userProfile && !gameState) {
+    if (isAuthReady && userProfile && (!gameState || gameState.isGameOver)) {
       const unsubscribe = listenForInvites(userProfile.uid, (games) => {
         if (games.length > 0) {
-          const game = games[0];
+          // Find the most recent active game that isn't the current one
+          const game = games.find(g => g.id !== gameState?.id);
+          if (!game) return;
+
+          // Check for timeout (2 hours of inactivity)
+          const now = Date.now();
+          const twoHours = 2 * 60 * 60 * 1000;
+          if (now - game.lastLifeChangeTimestamp > twoHours) {
+            console.log("Found timed out game, skipping:", game.id);
+            return;
+          }
+
           console.log("Invitación recibida, uniéndose a la partida:", game.id);
           
           // Marcamos como actualización remota para evitar subir el estado inicial
           isProcessingRemoteUpdate.current = true;
           
+          const normalize = (obj: any) => JSON.stringify(obj, Object.keys(obj).sort());
           const initialStateStr = JSON.stringify({
-            players: game.players.map(p => JSON.parse(JSON.stringify(p, Object.keys(p).sort()))),
+            players: game.players.map(p => JSON.parse(normalize(p))),
             isGameOver: game.isGameOver,
-            winner: game.winner ? JSON.parse(JSON.stringify(game.winner, Object.keys(game.winner).sort())) : null
+            winner: game.winner ? JSON.parse(normalize(game.winner)) : null
           });
           lastServerState.current = initialStateStr;
           
@@ -154,12 +167,30 @@ export default function App() {
             isGameOver: game.isGameOver,
             winner: game.winner,
             hostUid: game.hostUid,
+            lastLifeChangeTimestamp: game.lastLifeChangeTimestamp,
           });
         }
       });
       return () => unsubscribe();
     }
-  }, [isAuthReady, userProfile, !!gameState]);
+  }, [isAuthReady, userProfile, gameState?.id, gameState?.isGameOver]);
+
+  // Check for game timeout (2 hours of inactivity)
+  useEffect(() => {
+    if (!gameState || gameState.isGameOver || !gameState.lastLifeChangeTimestamp) return;
+
+    const checkTimeout = () => {
+      const now = Date.now();
+      const twoHours = 2 * 60 * 60 * 1000;
+      if (now - gameState.lastLifeChangeTimestamp > twoHours) {
+        console.log("Game timed out due to inactivity");
+        setGameState(prev => prev ? { ...prev, isGameOver: true, isTimeout: true } : null);
+      }
+    };
+
+    const interval = setInterval(checkTimeout, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, [gameState?.id, gameState?.isGameOver, gameState?.lastLifeChangeTimestamp]);
 
   // Sincronización en tiempo real: Escucha cambios en la partida activa desde Firestore
   useEffect(() => {
@@ -169,6 +200,15 @@ export default function App() {
       // Suscribirse a los cambios del documento de la partida en Firestore
       const unsubscribe = listenToActiveGame(gameId, (remoteGame) => {
         if (remoteGame) {
+          // Check for timeout (2 hours of inactivity)
+          const now = Date.now();
+          const twoHours = 2 * 60 * 60 * 1000;
+          if (now - remoteGame.lastLifeChangeTimestamp > twoHours && !remoteGame.isGameOver) {
+            console.log("Active game timed out");
+            setGameState(prev => prev ? { ...prev, isGameOver: true, isTimeout: true } : null);
+            return;
+          }
+
           // Función para normalizar objetos y comparar sin importar el orden de las claves
           const normalize = (obj: any) => JSON.stringify(obj, Object.keys(obj).sort());
           
@@ -205,6 +245,7 @@ export default function App() {
               isGameOver: remoteGame.isGameOver,
               winner: remoteGame.winner,
               hostUid: remoteGame.hostUid,
+              lastLifeChangeTimestamp: remoteGame.lastLifeChangeTimestamp,
             };
           });
         } else if (gameState && !gameState.isGameOver && gameState.id === gameId) {
@@ -267,6 +308,12 @@ export default function App() {
   // Automatic Game Saving
   useEffect(() => {
     if (gameState?.isGameOver && userProfile && gameState.startTime && !gameState.hasBeenSaved) {
+      // If it's a timeout, we don't save to history
+      if (gameState.isTimeout) {
+        setGameState(prev => prev ? { ...prev, hasBeenSaved: true } : null);
+        return;
+      }
+
       // Only save if it's a local game (no id) OR if the current user is the host
       const isHost = !gameState.id || gameState.hostUid === userProfile.uid;
       
@@ -311,6 +358,10 @@ export default function App() {
   };
 
   const startGame = (type: GameType, playerConfigs: { name: string; color: string; uid?: string; userCode?: string }[]) => {
+    if (gameState && !gameState.isGameOver) {
+      setActiveGameError("You are already in an active game. Please finish or leave it first.");
+      return;
+    }
     if (!userProfile) {
       setPendingGameConfig({ type, playerConfigs });
       setShowLoginSuggestion(true);
@@ -345,6 +396,7 @@ export default function App() {
       isGameOver: false,
       winner: null,
       hostUid: userProfile.uid,
+      lastLifeChangeTimestamp: Date.now(),
     };
 
     if (gameId) {
@@ -358,6 +410,7 @@ export default function App() {
         hostUid: userProfile.uid,
         participantUids,
         lastUpdated: Date.now(),
+        lastLifeChangeTimestamp: Date.now(),
       };
       
       // Inicializar el estado del servidor ANTES de crear la partida y setear el estado
@@ -426,7 +479,11 @@ export default function App() {
         return p;
       });
 
-      const newState = checkGameOver({ ...prev, players: newPlayers });
+      const newState = checkGameOver({ 
+        ...prev, 
+        players: newPlayers,
+        lastLifeChangeTimestamp: Date.now()
+      });
       return newState;
     });
   }, []);
@@ -449,7 +506,11 @@ export default function App() {
         return p;
       });
 
-      const newState = checkGameOver({ ...prev, players: newPlayers });
+      const newState = checkGameOver({ 
+        ...prev, 
+        players: newPlayers,
+        lastLifeChangeTimestamp: Date.now()
+      });
 
       return newState;
     });
@@ -478,11 +539,33 @@ export default function App() {
         return p;
       });
 
-      const newState = checkGameOver({ ...prev, players: newPlayers });
+      const newState = checkGameOver({ 
+        ...prev, 
+        players: newPlayers,
+        lastLifeChangeTimestamp: Date.now()
+      });
 
       return newState;
     });
   }, []);
+
+  const handleLeaveGame = () => {
+    if (!gameState || !userProfile) return;
+    
+    setGameState(prev => {
+      if (!prev) return null;
+      const newPlayers = prev.players.map(p => {
+        if (p.uid === userProfile.uid) {
+          return { ...p, isEliminated: true, life: 0 };
+        }
+        return p;
+      });
+      return checkGameOver({ ...prev, players: newPlayers, lastLifeChangeTimestamp: Date.now() });
+    });
+    
+    // If it's a multiplayer game, we stay in the game state but as eliminated
+    // unless the game is over. If the user wants to go home, they use exitToHome.
+  };
 
   const resetGame = () => {
     if (!gameState) return;
@@ -587,6 +670,8 @@ export default function App() {
           onHistoryClick={() => setIsHistoryModalOpen(true)}
           onFriendsClick={() => setIsFriendsModalOpen(true)}
           onHomeClick={exitToHome}
+          isInGame={!!gameState && !gameState.isGameOver}
+          onLeaveGame={handleLeaveGame}
         />
         
         <main className="lg:pl-20 pt-16 lg:pt-0 min-h-screen flex flex-col bg-zinc-950 overflow-y-auto select-none relative">
@@ -744,6 +829,20 @@ export default function App() {
             )}
           </AnimatePresence>
         </main>
+
+        <AnimatePresence>
+          {activeGameError && (
+            <motion.div
+              initial={{ opacity: 0, y: 50 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 50 }}
+              className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[60] bg-red-500 text-white px-6 py-3 rounded-xl font-bold shadow-xl flex items-center gap-3"
+            >
+              <X className="w-5 h-5 cursor-pointer" onClick={() => setActiveGameError(null)} />
+              <span>{activeGameError}</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <AnimatePresence>
           {showLoginModal && (

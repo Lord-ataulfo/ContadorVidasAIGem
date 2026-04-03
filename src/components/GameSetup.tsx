@@ -34,20 +34,32 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
   const prevUserRef = React.useRef(userProfile);
 
   useEffect(() => {
-    // If logging in, set the first player name
-    if (userProfile && !prevUserRef.current) {
-      const newNames = [...playerNames];
-      const newUids = [...playerUids];
-      const newCodes = [...playerCodes];
-      newNames[0] = userProfile.username;
-      newUids[0] = userProfile.uid;
-      newCodes[0] = userProfile.userCode;
-      setPlayerNames(newNames);
-      setPlayerUids(newUids);
-      setPlayerCodes(newCodes);
-    } 
-    // If logging out, clear the inputs
-    else if (!userProfile && prevUserRef.current) {
+    if (userProfile) {
+      setPlayerNames(prev => {
+        const newNames = [...prev];
+        if (newNames[0] !== userProfile.username) {
+          newNames[0] = userProfile.username;
+          return newNames;
+        }
+        return prev;
+      });
+      setPlayerUids(prev => {
+        const newUids = [...prev];
+        if (newUids[0] !== userProfile.uid) {
+          newUids[0] = userProfile.uid;
+          return newUids;
+        }
+        return prev;
+      });
+      setPlayerCodes(prev => {
+        const newCodes = [...prev];
+        if (newCodes[0] !== userProfile.userCode) {
+          newCodes[0] = userProfile.userCode;
+          return newCodes;
+        }
+        return prev;
+      });
+    } else {
       setPlayerNames(['', '', '', '', '', '', '', '']);
       setPlayerUids(Array(8).fill(undefined));
       setPlayerCodes(Array(8).fill(undefined));
