@@ -14,7 +14,7 @@ import {
   updateDoc,
   runTransaction,
 } from 'firebase/firestore';
-import { auth, db, handleFirestoreError, OperationType } from '../firebase.ts';
+import { auth, db, handleFirestoreError, OperationType, sanitizeForFirestore } from '../firebase.ts';
 import { UserProfile } from '../types.ts';
 
 const USERS_COLLECTION = 'users';
@@ -89,8 +89,8 @@ export const registerUser = async (email: string, password: string, username: st
       }
 
       // Write all documents
-      transaction.set(doc(db, USERS_COLLECTION, user.uid), userProfile);
-      transaction.set(doc(db, 'users_public', user.uid), userPublic);
+      transaction.set(doc(db, USERS_COLLECTION, user.uid), sanitizeForFirestore(userProfile));
+      transaction.set(doc(db, 'users_public', user.uid), sanitizeForFirestore(userPublic));
       transaction.set(usernameRef, { uid: user.uid });
       transaction.set(userCodeRef, { uid: user.uid });
     });
@@ -197,8 +197,8 @@ export const signInWithGoogle = async (): Promise<UserProfile> => {
         throw new Error('User code collision during Google sign-in. Please try again.');
       }
 
-      transaction.set(doc(db, USERS_COLLECTION, user.uid), userProfile);
-      transaction.set(doc(db, 'users_public', user.uid), userPublic);
+      transaction.set(doc(db, USERS_COLLECTION, user.uid), sanitizeForFirestore(userProfile));
+      transaction.set(doc(db, 'users_public', user.uid), sanitizeForFirestore(userPublic));
       transaction.set(usernameRef, { uid: user.uid });
       transaction.set(userCodeRef, { uid: user.uid });
     });

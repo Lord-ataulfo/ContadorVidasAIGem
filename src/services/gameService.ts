@@ -1,10 +1,11 @@
 import { collection, doc, setDoc, getDocs, query, orderBy, limit, onSnapshot, deleteDoc, where, updateDoc } from 'firebase/firestore';
-import { db, auth, handleFirestoreError, OperationType } from '../firebase.ts';
+import { db, auth, handleFirestoreError, OperationType, sanitizeForFirestore } from '../firebase.ts';
 import { GameRecord, ActiveGame } from '../types.ts';
 
 export const createActiveGame = async (game: ActiveGame) => {
   try {
-    await setDoc(doc(db, 'active_games', game.id), game);
+    const sanitizedGame = sanitizeForFirestore(game);
+    await setDoc(doc(db, 'active_games', game.id), sanitizedGame);
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, `active_games/${game.id}`);
   }
@@ -13,9 +14,10 @@ export const createActiveGame = async (game: ActiveGame) => {
 export const updateActiveGame = async (gameId: string, updates: Partial<ActiveGame>) => {
   try {
     console.log(`Intentando actualizar partida ${gameId}:`, updates);
+    const sanitizedUpdates = sanitizeForFirestore(updates);
     const gameRef = doc(db, 'active_games', gameId);
     await updateDoc(gameRef, { 
-      ...updates, 
+      ...sanitizedUpdates, 
       lastUpdated: Date.now() 
     });
     console.log(`Partida ${gameId} actualizada con éxito.`);
@@ -78,9 +80,11 @@ export const saveGameRecord = async (record: Omit<GameRecord, 'id' | 'userId'>, 
       userId: user.uid,
     };
 
+    const sanitizedRecord = sanitizeForFirestore(fullRecord);
+
     // Save to the current user's history
     const primaryPath = `users/${user.uid}/history/${gameId}`;
-    await setDoc(doc(db, primaryPath), fullRecord);
+    await setDoc(doc(db, primaryPath), sanitizedRecord);
 
     // Save to all other registered participants' histories
     const otherParticipants = record.participantUids.filter(uid => uid !== user.uid);
@@ -88,7 +92,7 @@ export const saveGameRecord = async (record: Omit<GameRecord, 'id' | 'userId'>, 
     for (const participantUid of otherParticipants) {
       const participantPath = `users/${participantUid}/history/${gameId}`;
       await setDoc(doc(db, participantPath), {
-        ...fullRecord,
+        ...sanitizedRecord,
         userId: participantUid, // Mark it as their record too
       });
     }

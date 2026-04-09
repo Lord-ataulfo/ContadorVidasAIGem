@@ -1,5 +1,5 @@
 import { collection, doc, setDoc, getDocs, query, where, limit, deleteDoc } from 'firebase/firestore';
-import { db, auth, handleFirestoreError, OperationType } from '../firebase.ts';
+import { db, auth, handleFirestoreError, OperationType, sanitizeForFirestore } from '../firebase.ts';
 import { Friend, UserProfile } from '../types.ts';
 
 export const addFriendByCode = async (userCode: string) => {
@@ -32,7 +32,7 @@ export const addFriendByCode = async (userCode: string) => {
     };
 
     const path = `users/${user.uid}/friends/${friendData.uid}`;
-    await setDoc(doc(db, path), friend);
+    await setDoc(doc(db, path), sanitizeForFirestore(friend));
     return friend;
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, usersPublicPath);

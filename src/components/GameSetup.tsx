@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { Play, Users, Swords, LogIn, LogOut, User, Share2, Copy, Check, UserPlus, Search, Loader2 } from 'lucide-react';
-import { GameType, UserProfile } from '../types.ts';
+import React, { useState, useEffect, useRef } from 'react';
+import { Play, Users, Swords, LogIn, LogOut, User, Share2, Copy, Check, UserPlus, Search, Loader2, UserCheck } from 'lucide-react';
+import { GameType, UserProfile, Friend } from '../types.ts';
 import { motion, AnimatePresence } from 'motion/react';
-import { getUserByCode } from '../services/authService.ts';
+import { getUserByCode, getPublicProfile } from '../services/authService.ts';
+import { getFriends } from '../services/friendService.ts';
 
 interface GameSetupProps {
   onStart: (type: GameType, players: { name: string; color: string; uid?: string; userCode?: string; photoURL?: string }[]) => void;
@@ -31,8 +32,24 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
   const [playerPhotos, setPlayerPhotos] = useState<(string | undefined)[]>(Array(8).fill(undefined));
   const [errors, setErrors] = useState<(string | null)[]>(Array(8).fill(null));
   const [searchingIndex, setSearchingIndex] = useState<number | null>(null);
+  const [friends, setFriends] = useState<Friend[]>([]);
+  const [showFriendsForIndex, setShowFriendsForIndex] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
-  const prevUserRef = React.useRef(userProfile);
+  const prevUserRef = useRef(userProfile);
+  const friendsModalRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showFriendsForIndex !== null && friendsModalRef.current && !friendsModalRef.current.contains(event.target as Node)) {
+        setShowFriendsForIndex(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showFriendsForIndex]);
 
   useEffect(() => {
     if (userProfile) {
@@ -78,6 +95,18 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
       setGameType('standard');
     }
     prevUserRef.current = userProfile;
+  }, [userProfile]);
+
+  useEffect(() => {
+    const fetchFriends = async () => {
+      if (userProfile) {
+        const friendsList = await getFriends();
+        setFriends(friendsList);
+      } else {
+        setFriends([]);
+      }
+    };
+    fetchFriends();
   }, [userProfile]);
 
   const handleResolveCode = async (index: number) => {
@@ -152,17 +181,7 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
 
   const handleNameChange = (index: number, name: string) => {
     const upperName = name.toUpperCase();
-    const newNames = [...playerNames];
-    newNames[index] = upperName;
-    setPlayerNames(newNames);
     
-    // Clear error when typing
-    if (errors[index]) {
-      const newErrors = [...errors];
-      newErrors[index] = null;
-      setErrors(newErrors);
-    }
-
     // Clear UID if name is changed and it's not the resolved username
     if (playerUids[index] && upperName !== playerNames[index]) {
       const newUids = [...playerUids];
@@ -174,6 +193,71 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
       setPlayerUids(newUids);
       setPlayerCodes(newCodes);
       setPlayerPhotos(newPhotos);
+    }
+    
+    const newNames = [...playerNames];
+    newNames[index] = upperName;
+    setPlayerNames(newNames);
+
+    // Clear error when typing
+    if (errors[index]) {
+      const newErrors = [...errors];
+      newErrors[index] = null;
+      setErrors(newErrors);
+    }
+  };
+
+  const handleSelectFriend = async (index: number, friend: Friend) => {
+    // Check if friend is already added to any slot
+    if (playerUids.includes(friend.friendUid)) {
+      const newErrors = [...errors];
+      newErrors[index] = "ESTE JUGADOR YA ESTÁ EN LA PARTIDA";
+      setErrors(newErrors);
+      setShowFriendsForIndex(null);
+      return;
+    }
+
+    setSearchingIndex(index);
+    setShowFriendsForIndex(null);
+
+    try {
+      // Fetch full public profile to get photoURL and ensure data is fresh
+      const profile = await getPublicProfile(friend.friendUid);
+      if (profile) {
+        const newNames = [...playerNames];
+        const newUids = [...playerUids];
+        const newCodes = [...playerCodes];
+        const newPhotos = [...playerPhotos];
+        
+        // We set the username as the display name, but we keep the UID and userCode
+        // for history and real-time communication as per requirements.
+        newNames[index] = profile.username;
+        newUids[index] = profile.uid;
+        newCodes[index] = profile.userCode;
+        newPhotos[index] = profile.photoURL;
+        
+        setPlayerNames(newNames);
+        setPlayerUids(newUids);
+        setPlayerCodes(newCodes);
+        setPlayerPhotos(newPhotos);
+        
+        const newErrors = [...errors];
+        newErrors[index] = null;
+        setErrors(newErrors);
+      } else {
+        const newErrors = [...errors];
+        newErrors[index] = "No se pudo obtener el perfil";
+        setErrors(newErrors);
+      }
+    } catch (err) {
+      console.error('Error selecting friend:', err);
+      const newErrors = [...errors];
+      newErrors[index] = "Error al seleccionar amigo";
+      setErrors(newErrors);
+    } finally {
+      setSearchingIndex(null);
+      // Ensure modal closes even on error
+      setShowFriendsForIndex(null);
     }
   };
 
@@ -360,7 +444,7 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
                       placeholder={i === 0 ? "YOUR NAME" : `PLAYER ${i + 1} OR #CODE`}
                       value={playerNames[i]}
                       onChange={(e) => handleNameChange(i, e.target.value)}
-                      className={`w-full bg-zinc-950 border rounded-xl px-4 py-2 text-sm focus:outline-none transition-colors pr-10 uppercase font-bold ${
+                      className={`w-full bg-zinc-950 border rounded-xl px-4 py-2 text-sm focus:outline-none transition-colors pr-20 uppercase font-bold ${
                         errors[i] ? 'border-red-500 focus:border-red-500' : 'border-zinc-800 focus:border-zinc-600'
                       }`}
                     />
@@ -369,25 +453,85 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
                         {errors[i]}
                       </p>
                     )}
-                    {playerNames[i].startsWith('#') && (
-                      <button
-                        onClick={() => handleResolveCode(i)}
-                        disabled={searchingIndex === i}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-white/10 rounded-lg transition-colors text-emerald-500 disabled:opacity-50"
-                        title="Resolve User Code"
-                      >
-                        {searchingIndex === i ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Search className="w-4 h-4" />
-                        )}
-                      </button>
-                    )}
-                    {playerUids[i] && !playerNames[i].startsWith('#') && (
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                        <User className="w-4 h-4 text-emerald-500" />
-                      </div>
-                    )}
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                      {userProfile && i > 0 && (
+                        <button
+                          onClick={() => setShowFriendsForIndex(showFriendsForIndex === i ? null : i)}
+                          className={`p-1 hover:bg-white/10 rounded-lg transition-colors ${showFriendsForIndex === i ? 'text-emerald-500 bg-white/5' : 'text-zinc-500'}`}
+                          title="Invite Friend"
+                        >
+                          <UserPlus className="w-4 h-4" />
+                        </button>
+                      )}
+                      {playerNames[i].startsWith('#') && (
+                        <button
+                          onClick={() => handleResolveCode(i)}
+                          disabled={searchingIndex === i}
+                          className="p-1 hover:bg-white/10 rounded-lg transition-colors text-emerald-500 disabled:opacity-50"
+                          title="Resolve User Code"
+                        >
+                          {searchingIndex === i ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Search className="w-4 h-4" />
+                          )}
+                        </button>
+                      )}
+                      {playerUids[i] && !playerNames[i].startsWith('#') && (
+                        <div className="p-1">
+                          <UserCheck className="w-4 h-4 text-emerald-500" />
+                        </div>
+                      )}
+                    </div>
+
+                    <AnimatePresence>
+                      {showFriendsForIndex === i && (
+                        <motion.div
+                          ref={friendsModalRef}
+                          initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                          className="absolute left-0 right-0 top-full mt-2 z-50 bg-zinc-900 border border-white/10 rounded-xl shadow-2xl overflow-hidden max-h-48 overflow-y-auto"
+                        >
+                          <div className="p-2 border-b border-white/5 bg-white/5">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Mis Amigos</span>
+                          </div>
+                          {friends.length === 0 ? (
+                            <div className="p-4 text-center">
+                              <p className="text-xs text-zinc-500">No tienes amigos agregados aún.</p>
+                            </div>
+                          ) : (
+                            <div className="p-1">
+                              {friends.map((friend) => {
+                                const isAlreadyAdded = playerUids.includes(friend.friendUid);
+                                return (
+                                  <button
+                                    key={friend.friendUid}
+                                    onClick={() => handleSelectFriend(i, friend)}
+                                    disabled={isAlreadyAdded}
+                                    className={`w-full flex items-center justify-between p-2 rounded-lg transition-colors group text-left ${
+                                      isAlreadyAdded ? 'opacity-40 cursor-not-allowed' : 'hover:bg-white/5'
+                                    }`}
+                                  >
+                                    <div className="flex flex-col">
+                                      <span className={`text-sm font-bold transition-colors ${isAlreadyAdded ? 'text-zinc-500' : 'text-zinc-200 group-hover:text-emerald-500'}`}>
+                                        {friend.username}
+                                      </span>
+                                      <span className="text-[10px] font-mono text-zinc-500">{friend.userCode}</span>
+                                    </div>
+                                    {isAlreadyAdded ? (
+                                      <UserCheck className="w-3 h-3 text-emerald-500/50" />
+                                    ) : (
+                                      <UserPlus className="w-3 h-3 text-zinc-600 group-hover:text-emerald-500 transition-colors" />
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 </div>
               ))}

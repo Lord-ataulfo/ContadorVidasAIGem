@@ -81,6 +81,32 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   throw new Error(JSON.stringify(errInfo));
 }
 
+/**
+ * Recursively removes undefined values from an object to make it compatible with Firestore.
+ */
+export function sanitizeForFirestore<T>(data: T): T {
+  if (data === null || data === undefined) return data;
+  
+  if (Array.isArray(data)) {
+    return data.map(item => sanitizeForFirestore(item)) as any;
+  }
+  
+  if (typeof data === 'object' && data.constructor === Object) {
+    const sanitized: any = {};
+    for (const key in data) {
+      if (Object.prototype.hasOwnProperty.call(data, key)) {
+        const value = (data as any)[key];
+        if (value !== undefined) {
+          sanitized[key] = sanitizeForFirestore(value);
+        }
+      }
+    }
+    return sanitized;
+  }
+  
+  return data;
+}
+
 // Connection test
 async function testConnection() {
   try {
