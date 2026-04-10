@@ -382,7 +382,13 @@ export default function App() {
   };
 
   const proceedWithGame = async (type: GameType, playerConfigs: { name: string; color: string; uid?: string; userCode?: string; photoURL?: string; commanderCard?: CommanderCard }[], isWaitingForCommanders?: boolean) => {
-    const initialLife = type === 'standard' ? 20 : 40;
+    let initialLife = type === 'standard' ? 20 : 40;
+    
+    // Rule: 30 life for 2-player Commander
+    if (type === 'commander' && playerConfigs.length === 2) {
+      initialLife = 30;
+    }
+
     const players: Player[] = playerConfigs.map((config, i) => ({
       id: i,
       name: config.name,
@@ -426,7 +432,7 @@ export default function App() {
         lastUpdated: Date.now(),
         lastLifeChangeTimestamp: Date.now(),
         isWaitingForCommanders,
-        readyPlayers: [userProfile.uid], // Host is ready by default
+        readyPlayers: [], // Nobody is ready yet, not even host
       };
       
       // Inicializar el estado del servidor ANTES de crear la partida y setear el estado
@@ -436,7 +442,7 @@ export default function App() {
         isGameOver: false,
         winner: null,
         isWaitingForCommanders,
-        readyPlayers: [userProfile.uid]
+        readyPlayers: []
       });
       
       lastServerState.current = initialStateStr;
@@ -578,6 +584,8 @@ export default function App() {
         }
         return p;
       });
+      
+      // We don't mark as ready here, just update the local state which will sync to Firestore
       return { ...prev, players: newPlayers };
     });
   };
@@ -596,6 +604,8 @@ export default function App() {
       const registeredPlayers = prev.players.filter(p => p.uid);
       const allReady = registeredPlayers.every(p => p.uid && newReadyPlayers.includes(p.uid));
       
+      console.log("Player ready:", userProfile.uid, "All ready?", allReady);
+
       return { 
         ...prev, 
         readyPlayers: newReadyPlayers,

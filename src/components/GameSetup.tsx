@@ -341,13 +341,12 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
       uid: finalUids[i],
       userCode: finalCodes[i],
       photoURL: finalPhotos[i],
-      commanderCard: finalCommanderCards[i],
+      commanderCard: undefined, // Removed pre-selection
     }));
     
     // Check if we need to wait for commanders
-    // We wait if there are registered guests (uid present and not host)
-    const registeredGuests = players.filter(p => p.uid && p.uid !== userProfile?.uid);
-    const isWaitingForCommanders = gameType === 'commander' && registeredGuests.length > 0;
+    // We wait if there are registered players (including host)
+    const isWaitingForCommanders = gameType === 'commander';
 
     setSearchingIndex(null);
     onStart(gameType, players, isWaitingForCommanders);
@@ -576,23 +575,9 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
                     </AnimatePresence>
 
                     {i === 0 && userProfile && gameType === 'commander' && (
-                      <button
-                        onClick={() => setShowCommanderSelector(true)}
-                        className="mt-2 flex items-center gap-2 px-3 py-1.5 bg-zinc-950 border border-white/10 rounded-lg hover:bg-white/5 transition-colors w-full"
-                      >
-                        {playerCommanderCards[0] ? (
-                          <>
-                            <img src={playerCommanderCards[0].imageURL} className="w-5 h-7 object-cover rounded shadow-sm" referrerPolicy="no-referrer" />
-                            <span className="text-xs font-bold truncate flex-1 text-left">{playerCommanderCards[0].name}</span>
-                            <Check className="w-3 h-3 text-emerald-500" />
-                          </>
-                        ) : (
-                          <>
-                            <Swords className="w-3 h-3 text-zinc-500" />
-                            <span className="text-xs text-zinc-500 flex-1 text-left">Elegir Comandante</span>
-                          </>
-                        )}
-                      </button>
+                      <div className="mt-2 p-3 bg-zinc-950/50 border border-white/5 rounded-xl text-center">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Seleccionarás tu comandante al iniciar la partida</p>
+                      </div>
                     )}
                   </div>
                 </div>

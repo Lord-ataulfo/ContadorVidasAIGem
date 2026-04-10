@@ -27,7 +27,7 @@ export const CommanderWaitingModal: React.FC<CommanderWaitingModalProps> = ({
   
   // Registered players who need to select a commander
   const registeredPlayers = gameState.players.filter(p => p.uid);
-  const allReady = registeredPlayers.every(p => p.uid && readyPlayers.includes(p.uid));
+  const allReady = registeredPlayers.length > 0 && registeredPlayers.every(p => p.uid && readyPlayers.includes(p.uid));
 
   useEffect(() => {
     if (currentUserUid) {
