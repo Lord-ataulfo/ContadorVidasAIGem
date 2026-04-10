@@ -283,7 +283,9 @@ export const CommanderModal: React.FC<CommanderModalProps> = ({
               ref={fileInputRef}
               onChange={handleFileChange}
               accept="image/*"
+              capture="environment"
               className="hidden"
+              style={{ display: 'none' }}
             />
           </div>
 
