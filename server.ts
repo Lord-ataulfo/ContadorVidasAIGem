@@ -26,42 +26,57 @@ async function startServer() {
         console.error("GEMINI_API_KEY is not set in the server environment.");
         return null;
       }
-      genAI = new GoogleGenAI(apiKey);
+      genAI = new GoogleGenAI({ apiKey });
     }
     return genAI;
   };
 
   // API Route for card name extraction
+  // CRITICAL: This must be defined BEFORE Vite middleware
   app.post("/api/extract-card-name", async (req, res) => {
+    console.log("Received extraction request on server");
     const { image } = req.body;
+    
     if (!image) {
       return res.status(400).json({ error: "No image provided" });
     }
 
     const aiInstance = getAI();
     if (!aiInstance) {
-      return res.status(500).json({ error: "AI service not configured on server" });
+      return res.status(500).json({ error: "AI service not configured on server. Check GEMINI_API_KEY." });
     }
 
     try {
-      const model = aiInstance.getGenerativeModel({ model: "gemini-1.5-flash" });
+      // Use the correct model name from the skill
+      const modelName = "gemini-3-flash-preview";
+      
       const cleanBase64 = image.replace(/^data:image\/\w+;base64,/, "");
 
-      const result = await model.generateContent([
-        "Extract the name of this Magic: The Gathering card. The name is located in the top left corner. Return ONLY the name of the card, nothing else.",
-        {
-          inlineData: {
-            mimeType: "image/jpeg",
-            data: cleanBase64,
+      const result = await aiInstance.models.generateContent({
+        model: modelName,
+        contents: [
+          {
+            parts: [
+              {
+                text: "Extract the name of this Magic: The Gathering card. The name is located in the top left corner. Return ONLY the name of the card, nothing else.",
+              },
+              {
+                inlineData: {
+                  mimeType: "image/jpeg",
+                  data: cleanBase64,
+                },
+              },
+            ],
           },
-        },
-      ]);
+        ],
+      });
 
-      const text = result.response.text();
+      const text = result.text;
+      console.log("Extraction successful:", text);
       res.json({ name: text ? text.trim() : null });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error extracting card name on server:", error);
-      res.status(500).json({ error: "Failed to extract card name" });
+      res.status(500).json({ error: error.message || "Failed to extract card name" });
     }
   });
 
