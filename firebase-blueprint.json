@@ -130,6 +130,10 @@
         "readyPlayers": {
           "type": "array",
           "items": { "type": "string" }
+        },
+        "joinedUids": {
+          "type": "array",
+          "items": { "type": "string" }
         }
       },
       "required": ["id", "gameType", "startTime", "isGameOver", "players", "participantUids", "lastUpdated", "hostUid", "lastLifeChangeTimestamp"]

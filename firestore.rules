@@ -119,7 +119,10 @@ service cloud.firestore {
              data.participantUids is list &&
              data.lastUpdated is number &&
              data.hostUid is string &&
-             data.lastLifeChangeTimestamp is number;
+             data.lastLifeChangeTimestamp is number &&
+             (!('joinedUids' in data) || data.joinedUids is list) &&
+             (!('readyPlayers' in data) || data.readyPlayers is list) &&
+             (!('isWaitingForCommanders' in data) || data.isWaitingForCommanders is bool);
     }
 
     // ===============================================================

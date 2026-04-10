@@ -24,10 +24,13 @@ export const CommanderWaitingModal: React.FC<CommanderWaitingModalProps> = ({
   const currentPlayer = gameState.players.find(p => p.uid === currentUserUid);
   const isHost = gameState.hostUid === currentUserUid;
   const readyPlayers = gameState.readyPlayers || [];
+  const joinedUids = gameState.joinedUids || [];
   
   // Registered players who need to select a commander
   const registeredPlayers = gameState.players.filter(p => p.uid);
-  const allReady = registeredPlayers.length > 0 && registeredPlayers.every(p => p.uid && readyPlayers.includes(p.uid));
+  
+  // We only wait for players who have actually joined the session
+  const allReady = joinedUids.length > 0 && joinedUids.every(uid => readyPlayers.includes(uid));
 
   useEffect(() => {
     if (currentUserUid) {
@@ -68,10 +71,14 @@ export const CommanderWaitingModal: React.FC<CommanderWaitingModalProps> = ({
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {registeredPlayers.map((p) => {
               const isPlayerReady = readyPlayers.includes(p.uid!);
+              const isPlayerJoined = joinedUids.includes(p.uid!);
+              
               return (
                 <div key={p.uid} className="flex flex-col items-center gap-2">
                   <div className={`relative w-12 h-12 rounded-full border-2 flex items-center justify-center transition-all ${
-                    isPlayerReady ? 'border-emerald-500 bg-emerald-500/20' : 'border-zinc-800 bg-zinc-950'
+                    isPlayerReady ? 'border-emerald-500 bg-emerald-500/20' : 
+                    isPlayerJoined ? 'border-zinc-400 bg-zinc-900' :
+                    'border-zinc-800 bg-zinc-950 opacity-40'
                   }`}>
                     {p.photoURL ? (
                       <img src={p.photoURL} className="w-full h-full rounded-full object-cover" referrerPolicy="no-referrer" />
@@ -83,10 +90,22 @@ export const CommanderWaitingModal: React.FC<CommanderWaitingModalProps> = ({
                         <Check className="w-3 h-3 text-zinc-950" />
                       </div>
                     )}
+                    {isPlayerJoined && !isPlayerReady && (
+                      <div className="absolute -bottom-1 -right-1 bg-zinc-400 rounded-full p-0.5">
+                        <Loader2 className="w-3 h-3 text-zinc-950 animate-spin" />
+                      </div>
+                    )}
                   </div>
-                  <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500 truncate w-full text-center">
-                    {p.name}
-                  </span>
+                  <div className="flex flex-col items-center">
+                    <span className={`text-[10px] font-black uppercase tracking-widest truncate w-20 text-center ${
+                      isPlayerJoined ? 'text-zinc-300' : 'text-zinc-600'
+                    }`}>
+                      {p.name}
+                    </span>
+                    <span className="text-[8px] uppercase tracking-tighter text-zinc-500">
+                      {isPlayerReady ? 'Listo' : isPlayerJoined ? 'Eligiendo...' : 'Desconectado'}
+                    </span>
+                  </div>
                 </div>
               );
             })}

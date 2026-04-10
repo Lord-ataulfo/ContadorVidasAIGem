@@ -157,16 +157,28 @@ export default function App() {
 
           console.log("Invitación recibida, uniéndose a la partida:", game.id);
           
+          // Add ourselves to joinedUids if not already there
+          const joinedUids = game.joinedUids || [];
+          if (!joinedUids.includes(userProfile.uid)) {
+            const newJoinedUids = [...joinedUids, userProfile.uid];
+            updateActiveGame(game.id, { joinedUids: newJoinedUids });
+          }
+
           // Marcamos como actualización remota para evitar subir el estado inicial
           isProcessingRemoteUpdate.current = true;
           
           const normalize = (obj: any) => JSON.stringify(obj, Object.keys(obj).sort());
-          const initialStateStr = JSON.stringify({
-            players: game.players.map(p => JSON.parse(normalize(p))),
-            isGameOver: game.isGameOver,
-            winner: game.winner ? JSON.parse(normalize(game.winner)) : null
+          
+          const getSyncStateStr = (g: any) => JSON.stringify({
+            players: g.players.map((p: any) => JSON.parse(normalize(p))),
+            isGameOver: g.isGameOver,
+            winner: g.winner ? JSON.parse(normalize(g.winner)) : null,
+            isWaitingForCommanders: g.isWaitingForCommanders,
+            readyPlayers: g.readyPlayers || [],
+            joinedUids: g.joinedUids || []
           });
-          lastServerState.current = initialStateStr;
+
+          lastServerState.current = getSyncStateStr(game);
           
           setGameState({
             id: game.id,
@@ -177,6 +189,9 @@ export default function App() {
             winner: game.winner,
             hostUid: game.hostUid,
             lastLifeChangeTimestamp: game.lastLifeChangeTimestamp,
+            isWaitingForCommanders: game.isWaitingForCommanders,
+            readyPlayers: game.readyPlayers || [],
+            joinedUids: game.joinedUids || (game.joinedUids ? game.joinedUids : [game.hostUid, userProfile.uid])
           });
         }
       });
@@ -221,21 +236,22 @@ export default function App() {
           // Función para normalizar objetos y comparar sin importar el orden de las claves
           const normalize = (obj: any) => JSON.stringify(obj, Object.keys(obj).sort());
           
-          const remoteStateStr = JSON.stringify({
-            players: remoteGame.players.map(p => JSON.parse(normalize(p))),
-            isGameOver: remoteGame.isGameOver,
-            winner: remoteGame.winner ? JSON.parse(normalize(remoteGame.winner)) : null
+          const getSyncStateStr = (game: any) => JSON.stringify({
+            players: game.players.map((p: any) => JSON.parse(normalize(p))),
+            isGameOver: game.isGameOver,
+            winner: game.winner ? JSON.parse(normalize(game.winner)) : null,
+            isWaitingForCommanders: game.isWaitingForCommanders,
+            readyPlayers: game.readyPlayers || [],
+            joinedUids: game.joinedUids || []
           });
+
+          const remoteStateStr = getSyncStateStr(remoteGame);
 
           setGameState(prev => {
             // Si no hay estado previo o el ID no coincide, ignoramos
             if (!prev || prev.id !== gameId) return prev;
             
-            const currentStateStr = JSON.stringify({
-              players: prev.players.map(p => JSON.parse(normalize(p))),
-              isGameOver: prev.isGameOver,
-              winner: prev.winner ? JSON.parse(normalize(prev.winner)) : null
-            });
+            const currentStateStr = getSyncStateStr(prev);
 
             // Si el estado local ya es igual al remoto, no hacemos nada
             if (currentStateStr === remoteStateStr) {
@@ -256,7 +272,8 @@ export default function App() {
               hostUid: remoteGame.hostUid,
               lastLifeChangeTimestamp: remoteGame.lastLifeChangeTimestamp,
               isWaitingForCommanders: remoteGame.isWaitingForCommanders,
-              readyPlayers: remoteGame.readyPlayers,
+              readyPlayers: remoteGame.readyPlayers || [],
+              joinedUids: remoteGame.joinedUids || [],
             };
           });
         } else if (gameState && !gameState.isGameOver && gameState.id === gameId) {
@@ -294,13 +311,16 @@ export default function App() {
     // Función para normalizar objetos y comparar sin importar el orden de las claves
     const normalize = (obj: any) => JSON.stringify(obj, Object.keys(obj).sort());
 
-    const currentStateStr = JSON.stringify({
-      players: gameState.players.map(p => JSON.parse(normalize(p))),
-      isGameOver: gameState.isGameOver,
-      winner: gameState.winner ? JSON.parse(normalize(gameState.winner)) : null,
-      isWaitingForCommanders: gameState.isWaitingForCommanders,
-      readyPlayers: gameState.readyPlayers
+    const getSyncStateStr = (game: any) => JSON.stringify({
+      players: game.players.map((p: any) => JSON.parse(normalize(p))),
+      isGameOver: game.isGameOver,
+      winner: game.winner ? JSON.parse(normalize(game.winner)) : null,
+      isWaitingForCommanders: game.isWaitingForCommanders,
+      readyPlayers: game.readyPlayers || [],
+      joinedUids: game.joinedUids || []
     });
+
+    const currentStateStr = getSyncStateStr(gameState);
 
     // Solo subimos a Firestore si el cambio es LOCAL y diferente a lo último que sabemos del servidor
     if (currentStateStr !== lastServerState.current) {
@@ -313,7 +333,8 @@ export default function App() {
         isGameOver: gameState.isGameOver,
         winner: gameState.winner,
         isWaitingForCommanders: gameState.isWaitingForCommanders,
-        readyPlayers: gameState.readyPlayers
+        readyPlayers: gameState.readyPlayers || [],
+        joinedUids: gameState.joinedUids || []
       }).finally(() => {
         setIsSyncing(false);
       });
@@ -422,6 +443,8 @@ export default function App() {
       hostUid: userProfile.uid,
       lastLifeChangeTimestamp: Date.now(),
       isWaitingForCommanders,
+      readyPlayers: [],
+      joinedUids: [userProfile.uid],
     };
 
     if (gameId) {
@@ -438,19 +461,22 @@ export default function App() {
         lastLifeChangeTimestamp: Date.now(),
         isWaitingForCommanders,
         readyPlayers: [], // Nobody is ready yet, not even host
+        joinedUids: [userProfile.uid], // Host is the first one joined
       };
       
       // Inicializar el estado del servidor ANTES de crear la partida y setear el estado
       const normalize = (obj: any) => JSON.stringify(obj, Object.keys(obj).sort());
-      const initialStateStr = JSON.stringify({
-        players: players.map(p => JSON.parse(normalize(p))),
-        isGameOver: false,
-        winner: null,
-        isWaitingForCommanders,
-        readyPlayers: []
-      });
       
-      lastServerState.current = initialStateStr;
+      const getSyncStateStr = (g: any) => JSON.stringify({
+        players: g.players.map((p: any) => JSON.parse(normalize(p))),
+        isGameOver: g.isGameOver,
+        winner: g.winner ? JSON.parse(normalize(g.winner)) : null,
+        isWaitingForCommanders: g.isWaitingForCommanders,
+        readyPlayers: g.readyPlayers || [],
+        joinedUids: g.joinedUids || []
+      });
+
+      lastServerState.current = getSyncStateStr(activeGame);
       isProcessingRemoteUpdate.current = false;
       
       await createActiveGame(activeGame);
@@ -605,11 +631,12 @@ export default function App() {
       
       const newReadyPlayers = [...readyPlayers, userProfile.uid];
       
-      // Check if ALL registered players are ready
-      const registeredPlayers = prev.players.filter(p => p.uid);
-      const allReady = registeredPlayers.every(p => p.uid && newReadyPlayers.includes(p.uid));
+      // Check if ALL JOINED players are ready
+      // We only wait for those who have actually joined the session
+      const joinedUids = prev.joinedUids || [prev.hostUid!];
+      const allReady = joinedUids.every(uid => newReadyPlayers.includes(uid));
       
-      console.log("Player ready:", userProfile.uid, "All ready?", allReady);
+      console.log("Player ready:", userProfile.uid, "Joined:", joinedUids, "Ready:", newReadyPlayers, "All ready?", allReady);
 
       return { 
         ...prev, 
