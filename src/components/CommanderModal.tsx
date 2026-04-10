@@ -71,12 +71,10 @@ export const CommanderModal: React.FC<CommanderModalProps> = ({
     setIsSaving(true);
     try {
       if (activeTab === 'add') {
-        const newCard = await addCommander(uid, { name: cardName, imageURL: previewUrl });
-        setCommanders(prev => [newCard, ...prev]);
+        await addCommander(uid, { name: cardName, imageURL: previewUrl });
         setActiveTab('list');
       } else if (activeTab === 'edit' && editingCard) {
         await updateCommander(uid, editingCard.id, { name: cardName, imageURL: previewUrl });
-        setCommanders(prev => prev.map(c => c.id === editingCard.id ? { ...c, name: cardName, imageURL: previewUrl } : c));
         setActiveTab('list');
       }
       resetForm();
@@ -92,7 +90,6 @@ export const CommanderModal: React.FC<CommanderModalProps> = ({
     setIsSaving(true);
     try {
       await deleteCommander(uid, commanderId);
-      setCommanders(prev => prev.filter(c => c.id !== commanderId));
     } catch (error) {
       console.error("Delete Error:", error);
     } finally {
