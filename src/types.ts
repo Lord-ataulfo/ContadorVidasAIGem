@@ -4,6 +4,13 @@ export interface CommanderDamage {
   [sourcePlayerId: string]: number;
 }
 
+export interface CommanderCard {
+  id: string;
+  name: string;
+  imageURL: string;
+  createdAt: string;
+}
+
 export interface UserProfile {
   uid: string;
   username: string;
@@ -12,6 +19,7 @@ export interface UserProfile {
   createdAt: string;
   photoURL?: string;
   provider?: 'google' | 'email';
+  commanderCard?: CommanderCard;
 }
 
 export interface GameRecord {
@@ -52,6 +60,7 @@ export interface Player {
   isEliminated: boolean;
   commanderDamage: CommanderDamage;
   poisonDamage: number;
+  commanderCard?: CommanderCard;
 }
 
 export interface GameState {

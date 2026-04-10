@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useState, useCallback, useEffect, ErrorInfo, ReactNode, useRef } from 'react';
 import { Menu, RotateCcw, Home, Trophy, AlertTriangle, RefreshCw, LogOut, LogIn, Cloud, CloudOff, X } from 'lucide-react';
-import { GameType, Player, GameState, UserProfile } from './types';
+import { GameType, Player, GameState, UserProfile, CommanderCard } from './types';
 import GameSetup from './components/GameSetup.tsx';
 import PlayerCard from './components/PlayerCard.tsx';
 import CommanderDamageModal from './components/CommanderDamageModal.tsx';
@@ -11,6 +11,7 @@ import { Navigation } from './components/Navigation.tsx';
 import { HistoryModal } from './components/HistoryModal.tsx';
 import { FriendsModal } from './components/FriendsModal.tsx';
 import { ProfileModal } from './components/ProfileModal.tsx';
+import { CommanderModal } from './components/CommanderModal.tsx';
 import { LoginSuggestionModal } from './components/LoginSuggestionModal.tsx';
 import { motion, AnimatePresence } from 'motion/react';
 import { subscribeToAuthChanges, getUserProfile, logoutUser } from './services/authService.ts';
@@ -99,10 +100,11 @@ export default function App() {
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [isFriendsModalOpen, setIsFriendsModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isCommanderModalOpen, setIsCommanderModalOpen] = useState(false);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [showLoginSuggestion, setShowLoginSuggestion] = useState(false);
   const [activeGameError, setActiveGameError] = useState<string | null>(null);
-  const [pendingGameConfig, setPendingGameConfig] = useState<{ type: GameType; playerConfigs: { name: string; color: string; uid?: string; userCode?: string }[] } | null>(null);
+  const [pendingGameConfig, setPendingGameConfig] = useState<{ type: GameType; playerConfigs: { name: string; color: string; uid?: string; userCode?: string; photoURL?: string; commanderCard?: CommanderCard }[] } | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastRemoteUpdate, setLastRemoteUpdate] = useState<number | null>(null);
   const isProcessingRemoteUpdate = useRef(false);
@@ -359,7 +361,7 @@ export default function App() {
     }
   };
 
-  const startGame = (type: GameType, playerConfigs: { name: string; color: string; uid?: string; userCode?: string; photoURL?: string }[]) => {
+  const startGame = (type: GameType, playerConfigs: { name: string; color: string; uid?: string; userCode?: string; photoURL?: string; commanderCard?: CommanderCard }[]) => {
     if (gameState && !gameState.isGameOver) {
       setActiveGameError("You are already in an active game. Please finish or leave it first.");
       return;
@@ -372,7 +374,7 @@ export default function App() {
     proceedWithGame(type, playerConfigs);
   };
 
-  const proceedWithGame = async (type: GameType, playerConfigs: { name: string; color: string; uid?: string; userCode?: string; photoURL?: string }[]) => {
+  const proceedWithGame = async (type: GameType, playerConfigs: { name: string; color: string; uid?: string; userCode?: string; photoURL?: string; commanderCard?: CommanderCard }[]) => {
     const initialLife = type === 'standard' ? 20 : 40;
     const players: Player[] = playerConfigs.map((config, i) => ({
       id: i,
@@ -382,6 +384,7 @@ export default function App() {
       life: initialLife,
       color: config.color,
       photoURL: config.photoURL,
+      commanderCard: config.commanderCard,
       isEliminated: false,
       commanderDamage: {},
       poisonDamage: 0,
@@ -612,6 +615,7 @@ export default function App() {
             onHistoryClick={() => setIsHistoryModalOpen(true)}
             onFriendsClick={() => setIsFriendsModalOpen(true)}
             onProfileClick={() => setIsProfileModalOpen(true)}
+            onCommanderClick={() => setIsCommanderModalOpen(true)}
             onHomeClick={exitToHome}
           />
           <main className="lg:pl-20 pt-16 lg:pt-0 min-h-screen bg-transparent">
@@ -644,6 +648,16 @@ export default function App() {
             isOpen={isFriendsModalOpen}
             onClose={() => setIsFriendsModalOpen(false)}
           />
+          <AnimatePresence>
+            {isCommanderModalOpen && userProfile && (
+              <CommanderModal 
+                isOpen={isCommanderModalOpen}
+                uid={userProfile.uid}
+                onClose={() => setIsCommanderModalOpen(false)}
+                onUpdate={(updatedCard) => setUserProfile(prev => prev ? { ...prev, commanderCard: updatedCard || undefined } : null)}
+              />
+            )}
+          </AnimatePresence>
           <AnimatePresence>
             {isProfileModalOpen && userProfile && (
               <ProfileModal 
@@ -683,6 +697,7 @@ export default function App() {
           onHistoryClick={() => setIsHistoryModalOpen(true)}
           onFriendsClick={() => setIsFriendsModalOpen(true)}
           onProfileClick={() => setIsProfileModalOpen(true)}
+          onCommanderClick={() => setIsCommanderModalOpen(true)}
           onHomeClick={exitToHome}
           isInGame={!!gameState && !gameState.isGameOver}
           onLeaveGame={handleLeaveGame}

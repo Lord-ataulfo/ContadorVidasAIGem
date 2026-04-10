@@ -13,9 +13,16 @@ import {
   setDoc, 
   updateDoc,
   runTransaction,
+  collection,
+  getDocs,
+  addDoc,
+  deleteDoc,
+  query,
+  orderBy,
+  onSnapshot
 } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType, sanitizeForFirestore } from '../firebase.ts';
-import { UserProfile } from '../types.ts';
+import { CommanderCard, UserProfile } from '../types.ts';
 
 const USERS_COLLECTION = 'users';
 const USERNAMES_COLLECTION = 'usernames';
@@ -229,11 +236,11 @@ export const getUserProfile = async (uid: string): Promise<UserProfile | null> =
   }
 };
 
-export const getPublicProfile = async (uid: string): Promise<{ uid: string; username: string; userCode: string; photoURL?: string } | null> => {
+export const getPublicProfile = async (uid: string): Promise<{ uid: string; username: string; userCode: string; photoURL?: string; commanderCard?: CommanderCard } | null> => {
   try {
     const userDoc = await getDoc(doc(db, 'users_public', uid));
     if (userDoc.exists()) {
-      return userDoc.data() as { uid: string; username: string; userCode: string; photoURL?: string };
+      return userDoc.data() as { uid: string; username: string; userCode: string; photoURL?: string; commanderCard?: CommanderCard };
     }
     return null;
   } catch (error) {
@@ -242,7 +249,7 @@ export const getPublicProfile = async (uid: string): Promise<{ uid: string; user
   }
 };
 
-export const getUserByCode = async (userCode: string): Promise<{ uid: string; username: string; userCode: string; photoURL?: string } | null> => {
+export const getUserByCode = async (userCode: string): Promise<{ uid: string; username: string; userCode: string; photoURL?: string; commanderCard?: CommanderCard } | null> => {
   try {
     // Ensure the code starts with # and is uppercase
     const formattedCode = userCode.startsWith('#') ? userCode.toUpperCase() : `#${userCode.toUpperCase()}`;
@@ -265,6 +272,69 @@ export const updateUserProfilePhoto = async (uid: string, photoURL: string | nul
     await updateDoc(doc(db, 'users_public', uid), { photoURL });
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, USERS_COLLECTION);
+    throw error;
+  }
+};
+
+export const updateCommanderCard = async (uid: string, commanderCard: CommanderCard | null): Promise<void> => {
+  try {
+    await updateDoc(doc(db, USERS_COLLECTION, uid), { commanderCard });
+    await updateDoc(doc(db, 'users_public', uid), { commanderCard });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, USERS_COLLECTION);
+    throw error;
+  }
+};
+
+export const addCommander = async (uid: string, commander: Omit<CommanderCard, 'id' | 'createdAt'>): Promise<CommanderCard> => {
+  try {
+    const commanderData = {
+      ...commander,
+      createdAt: new Date().toISOString()
+    };
+    const docRef = await addDoc(collection(db, USERS_COLLECTION, uid, 'commanders'), sanitizeForFirestore(commanderData));
+    return { ...commanderData, id: docRef.id };
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, 'commanders');
+    throw error;
+  }
+};
+
+export const getCommanders = async (uid: string): Promise<CommanderCard[]> => {
+  try {
+    const q = query(collection(db, USERS_COLLECTION, uid, 'commanders'), orderBy('createdAt', 'desc'));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as CommanderCard));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.GET, 'commanders');
+    throw error;
+  }
+};
+
+export const listenToCommanders = (uid: string, callback: (commanders: CommanderCard[]) => void) => {
+  const q = query(collection(db, USERS_COLLECTION, uid, 'commanders'), orderBy('createdAt', 'desc'));
+  return onSnapshot(q, (snapshot) => {
+    const commanders = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as CommanderCard));
+    callback(commanders);
+  }, (error) => {
+    handleFirestoreError(error, OperationType.GET, 'commanders');
+  });
+};
+
+export const updateCommander = async (uid: string, commanderId: string, updates: Partial<Omit<CommanderCard, 'id' | 'createdAt'>>): Promise<void> => {
+  try {
+    await updateDoc(doc(db, USERS_COLLECTION, uid, 'commanders', commanderId), sanitizeForFirestore(updates));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, 'commanders');
+    throw error;
+  }
+};
+
+export const deleteCommander = async (uid: string, commanderId: string): Promise<void> => {
+  try {
+    await deleteDoc(doc(db, USERS_COLLECTION, uid, 'commanders', commanderId));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, 'commanders');
     throw error;
   }
 };

@@ -14,6 +14,7 @@ interface NavigationProps {
   onFriendsClick: () => void;
   onHomeClick: () => void;
   onProfileClick: () => void;
+  onCommanderClick: () => void;
   onLeaveGame?: () => void;
   isInGame?: boolean;
 }
@@ -26,6 +27,7 @@ export const Navigation: React.FC<NavigationProps> = ({
   onFriendsClick,
   onHomeClick,
   onProfileClick,
+  onCommanderClick,
   onLeaveGame,
   isInGame
 }) => {
@@ -34,6 +36,7 @@ export const Navigation: React.FC<NavigationProps> = ({
   const menuItems = [
     { id: 'home', label: 'Home', icon: Home, onClick: onHomeClick, show: true },
     { id: 'history', label: 'History', icon: History, onClick: onHistoryClick, show: !!userProfile },
+    { id: 'commander', label: 'Commander', icon: Swords, onClick: onCommanderClick, show: !!userProfile },
     { id: 'friends', label: 'Friends', icon: Users, onClick: onFriendsClick, show: !!userProfile },
     { id: 'profile', label: 'Profile', icon: UserIcon, onClick: onProfileClick, show: !!userProfile },
     { id: 'leave', label: 'Leave Game', icon: LogOut, onClick: onLeaveGame || (() => {}), show: !!isInGame && !!onLeaveGame },
@@ -123,7 +126,7 @@ export const Navigation: React.FC<NavigationProps> = ({
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed right-0 top-0 bottom-0 w-80 bg-zinc-950 border-l border-white/10 z-50 lg:hidden flex flex-col"
+              className="fixed right-0 top-0 bottom-0 w-80 bg-zinc-950 border-l border-white/10 z-50 lg:hidden flex flex-col overflow-y-auto"
             >
               <div className="p-6 flex items-center justify-between border-b border-white/5">
                 <h2 className="text-xl font-serif font-bold text-emerald-500">Menu</h2>

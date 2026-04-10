@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Users, Swords, LogIn, LogOut, User, Share2, Copy, Check, UserPlus, Search, Loader2, UserCheck } from 'lucide-react';
-import { GameType, UserProfile, Friend } from '../types.ts';
+import { Play, Users, Swords, LogIn, LogOut, User, Share2, Copy, Check, UserPlus, Search, Loader2, UserCheck, X } from 'lucide-react';
+import { GameType, UserProfile, Friend, CommanderCard } from '../types.ts';
 import { motion, AnimatePresence } from 'motion/react';
-import { getUserByCode, getPublicProfile } from '../services/authService.ts';
+import { getUserByCode, getPublicProfile, getCommanders, listenToCommanders } from '../services/authService.ts';
 import { getFriends } from '../services/friendService.ts';
 
 interface GameSetupProps {
-  onStart: (type: GameType, players: { name: string; color: string; uid?: string; userCode?: string; photoURL?: string }[]) => void;
+  onStart: (type: GameType, players: { name: string; color: string; uid?: string; userCode?: string; photoURL?: string; commanderCard?: CommanderCard }[]) => void;
   userProfile: UserProfile | null;
   onLoginClick: () => void;
   onLogoutClick: () => void;
@@ -30,10 +30,13 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
   const [playerUids, setPlayerUids] = useState<(string | undefined)[]>(Array(8).fill(undefined));
   const [playerCodes, setPlayerCodes] = useState<(string | undefined)[]>(Array(8).fill(undefined));
   const [playerPhotos, setPlayerPhotos] = useState<(string | undefined)[]>(Array(8).fill(undefined));
+  const [playerCommanderCards, setPlayerCommanderCards] = useState<(CommanderCard | undefined)[]>(Array(8).fill(undefined));
   const [errors, setErrors] = useState<(string | null)[]>(Array(8).fill(null));
   const [searchingIndex, setSearchingIndex] = useState<number | null>(null);
   const [friends, setFriends] = useState<Friend[]>([]);
   const [showFriendsForIndex, setShowFriendsForIndex] = useState<number | null>(null);
+  const [showCommanderSelector, setShowCommanderSelector] = useState(false);
+  const [savedCommanders, setSavedCommanders] = useState<CommanderCard[]>([]);
   const [copied, setCopied] = useState(false);
   const prevUserRef = useRef(userProfile);
   const friendsModalRef = useRef<HTMLDivElement>(null);
@@ -85,11 +88,20 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
         }
         return prev;
       });
+      setPlayerCommanderCards(prev => {
+        const newCards = [...prev];
+        if (JSON.stringify(newCards[0]) !== JSON.stringify(userProfile.commanderCard)) {
+          newCards[0] = userProfile.commanderCard;
+          return newCards;
+        }
+        return prev;
+      });
     } else {
       setPlayerNames(['', '', '', '', '', '', '', '']);
       setPlayerUids(Array(8).fill(undefined));
       setPlayerCodes(Array(8).fill(undefined));
       setPlayerPhotos(Array(8).fill(undefined));
+      setPlayerCommanderCards(Array(8).fill(undefined));
       setErrors(Array(8).fill(null));
       setPlayerCount(2);
       setGameType('standard');
@@ -109,6 +121,19 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
     fetchFriends();
   }, [userProfile]);
 
+  useEffect(() => {
+    if (!userProfile) {
+      setSavedCommanders([]);
+      return;
+    }
+
+    const unsubscribe = listenToCommanders(userProfile.uid, (list) => {
+      setSavedCommanders(list);
+    });
+
+    return () => unsubscribe();
+  }, [userProfile]);
+
   const handleResolveCode = async (index: number) => {
     const name = playerNames[index].trim();
     if (!name.startsWith('#')) return;
@@ -125,14 +150,17 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
         const newUids = [...playerUids];
         const newCodes = [...playerCodes];
         const newPhotos = [...playerPhotos];
+        const newCards = [...playerCommanderCards];
         newNames[index] = profile.username;
         newUids[index] = profile.uid;
         newCodes[index] = profile.userCode;
         newPhotos[index] = profile.photoURL;
+        newCards[index] = profile.commanderCard;
         setPlayerNames(newNames);
         setPlayerUids(newUids);
         setPlayerCodes(newCodes);
         setPlayerPhotos(newPhotos);
+        setPlayerCommanderCards(newCards);
       } else {
         const updatedErrors = [...errors];
         updatedErrors[index] = "User not found";
@@ -187,12 +215,15 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
       const newUids = [...playerUids];
       const newCodes = [...playerCodes];
       const newPhotos = [...playerPhotos];
+      const newCards = [...playerCommanderCards];
       newUids[index] = undefined;
       newCodes[index] = undefined;
       newPhotos[index] = undefined;
+      newCards[index] = undefined;
       setPlayerUids(newUids);
       setPlayerCodes(newCodes);
       setPlayerPhotos(newPhotos);
+      setPlayerCommanderCards(newCards);
     }
     
     const newNames = [...playerNames];
@@ -228,6 +259,7 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
         const newUids = [...playerUids];
         const newCodes = [...playerCodes];
         const newPhotos = [...playerPhotos];
+        const newCards = [...playerCommanderCards];
         
         // We set the username as the display name, but we keep the UID and userCode
         // for history and real-time communication as per requirements.
@@ -235,11 +267,13 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
         newUids[index] = profile.uid;
         newCodes[index] = profile.userCode;
         newPhotos[index] = profile.photoURL;
+        newCards[index] = profile.commanderCard;
         
         setPlayerNames(newNames);
         setPlayerUids(newUids);
         setPlayerCodes(newCodes);
         setPlayerPhotos(newPhotos);
+        setPlayerCommanderCards(newCards);
         
         const newErrors = [...errors];
         newErrors[index] = null;
@@ -267,6 +301,7 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
     const finalUids = [...playerUids];
     const finalCodes = [...playerCodes];
     const finalPhotos = [...playerPhotos];
+    const finalCommanderCards = [...playerCommanderCards];
     const newErrors = [...errors];
     let hasError = false;
 
@@ -280,6 +315,7 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
             finalUids[i] = profile.uid;
             finalCodes[i] = profile.userCode;
             finalPhotos[i] = profile.photoURL;
+            finalCommanderCards[i] = profile.commanderCard;
             newErrors[i] = null;
           } else {
             newErrors[i] = "User not found";
@@ -305,6 +341,7 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
       uid: finalUids[i],
       userCode: finalCodes[i],
       photoURL: finalPhotos[i],
+      commanderCard: finalCommanderCards[i],
     }));
     
     setSearchingIndex(null);
@@ -532,6 +569,26 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
                         </motion.div>
                       )}
                     </AnimatePresence>
+
+                    {i === 0 && userProfile && gameType === 'commander' && (
+                      <button
+                        onClick={() => setShowCommanderSelector(true)}
+                        className="mt-2 flex items-center gap-2 px-3 py-1.5 bg-zinc-950 border border-white/10 rounded-lg hover:bg-white/5 transition-colors w-full"
+                      >
+                        {playerCommanderCards[0] ? (
+                          <>
+                            <img src={playerCommanderCards[0].imageURL} className="w-5 h-7 object-cover rounded shadow-sm" referrerPolicy="no-referrer" />
+                            <span className="text-xs font-bold truncate flex-1 text-left">{playerCommanderCards[0].name}</span>
+                            <Check className="w-3 h-3 text-emerald-500" />
+                          </>
+                        ) : (
+                          <>
+                            <Swords className="w-3 h-3 text-zinc-500" />
+                            <span className="text-xs text-zinc-500 flex-1 text-left">Elegir Comandante</span>
+                          </>
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -552,6 +609,79 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
           {searchingIndex === -1 ? 'Resolving...' : 'Start Battle'}
         </button>
       </div>
+
+      {/* Commander Selector Modal */}
+      <AnimatePresence>
+        {showCommanderSelector && (
+          <div 
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+            onClick={() => setShowCommanderSelector(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-lg bg-zinc-900 border border-white/10 rounded-3xl overflow-hidden flex flex-col max-h-[80vh]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6 border-b border-white/5 flex items-center justify-between">
+                <h3 className="text-xl font-black uppercase tracking-tight text-white">Elegir Comandante</h3>
+                <button 
+                  onClick={() => setShowCommanderSelector(false)}
+                  className="p-2 hover:bg-white/5 rounded-full transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6">
+                {savedCommanders.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Swords className="w-12 h-12 text-zinc-800 mx-auto mb-4" />
+                    <p className="text-zinc-500">No tienes comandantes guardados.</p>
+                    <p className="text-xs text-zinc-600 mt-1">Ve al menú de Comandante para añadir uno.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4">
+                    {savedCommanders.map((c) => (
+                      <button
+                        key={c.id}
+                        onClick={() => {
+                          const newCards = [...playerCommanderCards];
+                          newCards[0] = c;
+                          setPlayerCommanderCards(newCards);
+                          setShowCommanderSelector(false);
+                        }}
+                        className={`group relative aspect-[2.5/3.5] rounded-xl overflow-hidden border-2 transition-all ${
+                          playerCommanderCards[0]?.id === c.id 
+                            ? 'border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.2)]' 
+                            : 'border-white/5 hover:border-white/20'
+                        }`}
+                      >
+                        <img 
+                          src={c.imageURL} 
+                          alt={c.name} 
+                          className="w-full h-full object-cover transition-transform group-hover:scale-110"
+                          referrerPolicy="no-referrer"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                        <div className="absolute bottom-0 left-0 right-0 p-3">
+                          <p className="text-xs font-bold truncate text-white">{c.name}</p>
+                        </div>
+                        {playerCommanderCards[0]?.id === c.id && (
+                          <div className="absolute top-2 right-2 bg-emerald-500 rounded-full p-1">
+                            <Check className="w-3 h-3 text-zinc-950" />
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
     </div>
   );

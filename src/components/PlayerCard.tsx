@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Minus, Swords, Skull } from 'lucide-react';
+import { Plus, Minus, Swords, Skull, X } from 'lucide-react';
 import { Player, GameType } from '../types.ts';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -24,6 +24,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
 }) => {
   const [change, setChange] = useState<number | null>(null);
   const [poisonChange, setPoisonChange] = useState<number | null>(null);
+  const [showCommanderModal, setShowCommanderModal] = useState(false);
   const changeTimeout = useRef<NodeJS.Timeout | null>(null);
   const poisonChangeTimeout = useRef<NodeJS.Timeout | null>(null);
 
@@ -47,8 +48,6 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
     }, 2000);
   };
 
-  const commanderDamageTotal = (Object.values(player.commanderDamage) as number[]).reduce((a, b) => a + b, 0);
-
   return (
     <div 
       className={`relative flex flex-col items-center justify-center p-4 transition-all duration-500 overflow-hidden min-h-[300px] ${
@@ -71,6 +70,26 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
       <div className="absolute inset-0 z-0 opacity-10 pointer-events-none">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white/20 via-transparent to-transparent" />
       </div>
+
+      {/* Commander Card Display */}
+      {player.commanderCard && (
+        <div className="absolute top-4 right-4 flex flex-col items-end gap-1 z-20">
+          <span className="text-[10px] font-bold uppercase tracking-widest opacity-70 drop-shadow-md max-w-[80px] truncate text-right">
+            {player.commanderCard.name}
+          </span>
+          <button 
+            onClick={() => setShowCommanderModal(true)}
+            className="w-10 h-10 rounded-lg overflow-hidden border border-white/20 shadow-lg active:scale-95 transition-transform bg-zinc-900"
+          >
+            <img 
+              src={player.commanderCard.imageURL} 
+              alt={player.commanderCard.name} 
+              className="w-full h-full object-cover"
+              referrerPolicy="no-referrer"
+            />
+          </button>
+        </div>
+      )}
 
       <div className="z-10 flex flex-col items-center gap-2 w-full max-w-[200px]">
         <div className="flex flex-col items-center gap-1">
@@ -229,6 +248,42 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
           </span>
         </div>
       )}
+
+      {/* Commander Card Modal */}
+      <AnimatePresence>
+        {showCommanderModal && player.commanderCard && (
+          <div 
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md"
+            onClick={() => setShowCommanderModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative max-w-full max-h-full flex flex-col items-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setShowCommanderModal(false)}
+                className="absolute -top-12 right-0 p-2 text-white bg-white/10 hover:bg-white/20 rounded-full transition-colors"
+              >
+                <X size={24} />
+              </button>
+              <img 
+                src={player.commanderCard.imageURL} 
+                alt={player.commanderCard.name} 
+                className="max-w-full max-h-[75vh] rounded-2xl shadow-2xl border border-white/10 object-contain"
+                referrerPolicy="no-referrer"
+              />
+              <div className="mt-6 text-center">
+                <h3 className="text-2xl font-serif font-bold text-white uppercase tracking-wider drop-shadow-lg">
+                  {player.commanderCard.name}
+                </h3>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
