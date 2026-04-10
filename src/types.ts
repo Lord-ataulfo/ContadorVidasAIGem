@@ -74,6 +74,8 @@ export interface GameState {
   hasBeenSaved?: boolean;
   lastLifeChangeTimestamp?: number;
   isTimeout?: boolean;
+  isWaitingForCommanders?: boolean;
+  readyPlayers?: string[];
 }
 
 export interface ActiveGame {
@@ -87,4 +89,6 @@ export interface ActiveGame {
   participantUids: string[];
   lastUpdated: number;
   lastLifeChangeTimestamp: number;
+  isWaitingForCommanders?: boolean;
+  readyPlayers?: string[]; // UIDs of players who have selected their commander/ready
 }

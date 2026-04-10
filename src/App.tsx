@@ -12,6 +12,7 @@ import { HistoryModal } from './components/HistoryModal.tsx';
 import { FriendsModal } from './components/FriendsModal.tsx';
 import { ProfileModal } from './components/ProfileModal.tsx';
 import { CommanderModal } from './components/CommanderModal.tsx';
+import { CommanderWaitingModal } from './components/CommanderWaitingModal.tsx';
 import { LoginSuggestionModal } from './components/LoginSuggestionModal.tsx';
 import { motion, AnimatePresence } from 'motion/react';
 import { subscribeToAuthChanges, getUserProfile, logoutUser } from './services/authService.ts';
@@ -250,6 +251,8 @@ export default function App() {
               winner: remoteGame.winner,
               hostUid: remoteGame.hostUid,
               lastLifeChangeTimestamp: remoteGame.lastLifeChangeTimestamp,
+              isWaitingForCommanders: remoteGame.isWaitingForCommanders,
+              readyPlayers: remoteGame.readyPlayers,
             };
           });
         } else if (gameState && !gameState.isGameOver && gameState.id === gameId) {
@@ -290,7 +293,9 @@ export default function App() {
     const currentStateStr = JSON.stringify({
       players: gameState.players.map(p => JSON.parse(normalize(p))),
       isGameOver: gameState.isGameOver,
-      winner: gameState.winner ? JSON.parse(normalize(gameState.winner)) : null
+      winner: gameState.winner ? JSON.parse(normalize(gameState.winner)) : null,
+      isWaitingForCommanders: gameState.isWaitingForCommanders,
+      readyPlayers: gameState.readyPlayers
     });
 
     // Solo subimos a Firestore si el cambio es LOCAL y diferente a lo último que sabemos del servidor
@@ -302,7 +307,9 @@ export default function App() {
       updateActiveGame(gameState.id, {
         players: gameState.players,
         isGameOver: gameState.isGameOver,
-        winner: gameState.winner
+        winner: gameState.winner,
+        isWaitingForCommanders: gameState.isWaitingForCommanders,
+        readyPlayers: gameState.readyPlayers
       }).finally(() => {
         setIsSyncing(false);
       });
@@ -361,7 +368,7 @@ export default function App() {
     }
   };
 
-  const startGame = (type: GameType, playerConfigs: { name: string; color: string; uid?: string; userCode?: string; photoURL?: string; commanderCard?: CommanderCard }[]) => {
+  const startGame = (type: GameType, playerConfigs: { name: string; color: string; uid?: string; userCode?: string; photoURL?: string; commanderCard?: CommanderCard }[], isWaitingForCommanders?: boolean) => {
     if (gameState && !gameState.isGameOver) {
       setActiveGameError("You are already in an active game. Please finish or leave it first.");
       return;
@@ -371,10 +378,10 @@ export default function App() {
       setShowLoginSuggestion(true);
       return;
     }
-    proceedWithGame(type, playerConfigs);
+    proceedWithGame(type, playerConfigs, isWaitingForCommanders);
   };
 
-  const proceedWithGame = async (type: GameType, playerConfigs: { name: string; color: string; uid?: string; userCode?: string; photoURL?: string; commanderCard?: CommanderCard }[]) => {
+  const proceedWithGame = async (type: GameType, playerConfigs: { name: string; color: string; uid?: string; userCode?: string; photoURL?: string; commanderCard?: CommanderCard }[], isWaitingForCommanders?: boolean) => {
     const initialLife = type === 'standard' ? 20 : 40;
     const players: Player[] = playerConfigs.map((config, i) => ({
       id: i,
@@ -403,6 +410,7 @@ export default function App() {
       winner: null,
       hostUid: userProfile.uid,
       lastLifeChangeTimestamp: Date.now(),
+      isWaitingForCommanders,
     };
 
     if (gameId) {
@@ -417,6 +425,8 @@ export default function App() {
         participantUids,
         lastUpdated: Date.now(),
         lastLifeChangeTimestamp: Date.now(),
+        isWaitingForCommanders,
+        readyPlayers: [userProfile.uid], // Host is ready by default
       };
       
       // Inicializar el estado del servidor ANTES de crear la partida y setear el estado
@@ -424,7 +434,9 @@ export default function App() {
       const initialStateStr = JSON.stringify({
         players: players.map(p => JSON.parse(normalize(p))),
         isGameOver: false,
-        winner: null
+        winner: null,
+        isWaitingForCommanders,
+        readyPlayers: [userProfile.uid]
       });
       
       lastServerState.current = initialStateStr;
@@ -555,6 +567,44 @@ export default function App() {
     });
   }, []);
 
+  const handleGuestCommanderSelect = (commander: CommanderCard | null) => {
+    if (!gameState || !userProfile) return;
+    
+    setGameState(prev => {
+      if (!prev) return null;
+      const newPlayers = prev.players.map(p => {
+        if (p.uid === userProfile.uid) {
+          return { ...p, commanderCard: commander || undefined };
+        }
+        return p;
+      });
+      return { ...prev, players: newPlayers };
+    });
+  };
+
+  const handleGuestReady = () => {
+    if (!gameState || !userProfile) return;
+    
+    setGameState(prev => {
+      if (!prev) return null;
+      const readyPlayers = prev.readyPlayers || [];
+      if (readyPlayers.includes(userProfile.uid)) return prev;
+      
+      const newReadyPlayers = [...readyPlayers, userProfile.uid];
+      
+      // Check if ALL registered players are ready
+      const registeredPlayers = prev.players.filter(p => p.uid);
+      const allReady = registeredPlayers.every(p => p.uid && newReadyPlayers.includes(p.uid));
+      
+      return { 
+        ...prev, 
+        readyPlayers: newReadyPlayers,
+        isWaitingForCommanders: !allReady,
+        startTime: allReady ? Date.now() : prev.startTime
+      };
+    });
+  };
+
   const handleLeaveGame = () => {
     if (!gameState || !userProfile) return;
     
@@ -586,7 +636,7 @@ export default function App() {
   };
 
   const exitToHome = () => {
-    if (gameState?.id) {
+    if (gameState?.id && gameState.hostUid === userProfile?.uid) {
       deleteActiveGame(gameState.id);
     }
     setGameState(null);
@@ -664,6 +714,16 @@ export default function App() {
                 userProfile={userProfile} 
                 onClose={() => setIsProfileModalOpen(false)}
                 onUpdate={(updated) => setUserProfile(updated)}
+              />
+            )}
+          </AnimatePresence>
+          <AnimatePresence>
+            {gameState?.isWaitingForCommanders && userProfile && (
+              <CommanderWaitingModal
+                gameState={gameState}
+                currentUserUid={userProfile.uid}
+                onSelectCommander={handleGuestCommanderSelect}
+                onReady={handleGuestReady}
               />
             )}
           </AnimatePresence>
@@ -796,6 +856,16 @@ export default function App() {
           </div>
 
           {/* Modals */}
+          <AnimatePresence>
+            {gameState.isWaitingForCommanders && userProfile && (
+              <CommanderWaitingModal
+                gameState={gameState}
+                currentUserUid={userProfile.uid}
+                onSelectCommander={handleGuestCommanderSelect}
+                onReady={handleGuestReady}
+              />
+            )}
+          </AnimatePresence>
           <AnimatePresence>
             {activePlayerForDamage && (
               <CommanderDamageModal 

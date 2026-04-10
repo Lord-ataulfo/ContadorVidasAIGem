@@ -6,7 +6,7 @@ import { getUserByCode, getPublicProfile, getCommanders, listenToCommanders } fr
 import { getFriends } from '../services/friendService.ts';
 
 interface GameSetupProps {
-  onStart: (type: GameType, players: { name: string; color: string; uid?: string; userCode?: string; photoURL?: string; commanderCard?: CommanderCard }[]) => void;
+  onStart: (type: GameType, players: { name: string; color: string; uid?: string; userCode?: string; photoURL?: string; commanderCard?: CommanderCard }[], isWaitingForCommanders?: boolean) => void;
   userProfile: UserProfile | null;
   onLoginClick: () => void;
   onLogoutClick: () => void;
@@ -344,8 +344,13 @@ export default function GameSetup({ onStart, userProfile, onLoginClick, onLogout
       commanderCard: finalCommanderCards[i],
     }));
     
+    // Check if we need to wait for commanders
+    // We wait if there are registered guests (uid present and not host)
+    const registeredGuests = players.filter(p => p.uid && p.uid !== userProfile?.uid);
+    const isWaitingForCommanders = gameType === 'commander' && registeredGuests.length > 0;
+
     setSearchingIndex(null);
-    onStart(gameType, players);
+    onStart(gameType, players, isWaitingForCommanders);
   };
 
   return (
