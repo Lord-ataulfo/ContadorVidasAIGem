@@ -111,25 +111,30 @@ service cloud.firestore {
     }
 
     function isValidActiveGame(data) {
-      return data.keys().hasAll(['id', 'gameType', 'startTime', 'isGameOver', 'players', 'participantUids', 'lastUpdated']) &&
+      return data.keys().hasAll(['id', 'gameType', 'startTime', 'isGameOver', 'players', 'participantUids', 'lastUpdated', 'hostUid', 'lastLifeChangeTimestamp']) &&
              data.id is string &&
-             data.gameType in ['standard', 'commander'] &&
              data.startTime is number &&
              data.isGameOver is bool &&
              data.players is list &&
              data.participantUids is list &&
-             data.lastUpdated is number;
+             data.lastUpdated is number &&
+             data.hostUid is string &&
+             data.lastLifeChangeTimestamp is number;
     }
 
     // ===============================================================
     // Collection Rules
     // ===============================================================
 
+    match /test/{docId} {
+      allow read, write: if true;
+    }
+
     match /active_games/{gameId} {
-      allow read: if isAuthenticated() && request.auth.uid in resource.data.participantUids;
-      allow create: if isAuthenticated() && request.auth.uid in request.resource.data.participantUids && isValidActiveGame(request.resource.data);
-      allow update: if isAuthenticated() && request.auth.uid in resource.data.participantUids && isValidActiveGame(request.resource.data);
-      allow delete: if isAuthenticated() && request.auth.uid in resource.data.participantUids;
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidActiveGame(request.resource.data);
+      allow update: if isAuthenticated() && isValidActiveGame(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.hostUid == request.auth.uid || resource.data.participantUids.hasAny([request.auth.uid]));
     }
 
     match /users/{uid} {

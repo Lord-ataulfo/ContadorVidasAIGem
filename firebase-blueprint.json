@@ -80,6 +80,7 @@
         "addedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["uid", "friendUid", "username", "userCode", "addedAt"]
+    },
     "UserPublic": {
       "title": "Public User Profile",
       "description": "Stores non-sensitive user information for discovery and friends.",
@@ -122,9 +123,16 @@
           "type": "array",
           "items": { "type": "string" }
         },
-        "lastUpdated": { "type": "number" }
+        "lastUpdated": { "type": "number" },
+        "hostUid": { "type": "string" },
+        "lastLifeChangeTimestamp": { "type": "number" },
+        "isWaitingForCommanders": { "type": "boolean" },
+        "readyPlayers": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
       },
-      "required": ["id", "gameType", "startTime", "isGameOver", "players", "participantUids", "lastUpdated"]
+      "required": ["id", "gameType", "startTime", "isGameOver", "players", "participantUids", "lastUpdated", "hostUid", "lastLifeChangeTimestamp"]
     }
   },
   "firestore": {

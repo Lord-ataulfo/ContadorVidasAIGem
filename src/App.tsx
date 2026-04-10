@@ -148,6 +148,10 @@ export default function App() {
           const twoHours = 2 * 60 * 60 * 1000;
           if (now - game.lastLifeChangeTimestamp > twoHours) {
             console.log("Found timed out game, skipping:", game.id);
+            // If we are the host of a timed out game, we should probably delete it
+            if (game.hostUid === userProfile.uid) {
+              deleteActiveGame(game.id);
+            }
             return;
           }
 
@@ -404,6 +408,7 @@ export default function App() {
     }));
 
     const participantUids = players.map(p => p.uid).filter(Boolean) as string[];
+    console.log("Creating game with participantUids:", participantUids);
     const isMultiplayer = participantUids.length > 1;
     const gameId = isMultiplayer ? `game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}` : undefined;
 
@@ -646,11 +651,27 @@ export default function App() {
   };
 
   const exitToHome = () => {
-    if (gameState?.id && gameState.hostUid === userProfile?.uid) {
-      deleteActiveGame(gameState.id);
+    if (gameState?.id) {
+      // If we are the host, we delete the game for everyone
+      if (gameState.hostUid === userProfile?.uid) {
+        deleteActiveGame(gameState.id);
+      } else if (userProfile) {
+        // If we are a guest, we just remove ourselves from the local view
+        // The host will still see us as eliminated if we used handleLeaveGame
+      }
     }
     setGameState(null);
     setShowMenu(false);
+  };
+
+  const forceClearGame = () => {
+    if (gameState?.id && userProfile?.uid === gameState.hostUid) {
+      deleteActiveGame(gameState.id);
+    }
+    setGameState(null);
+    localStorage.removeItem('kirocos_last_game_id'); // Clear any local persistence if added
+    setShowMenu(false);
+    window.location.reload(); // Hard reset to clear any stuck listeners
   };
 
   if (!isAuthReady) {
@@ -806,6 +827,13 @@ export default function App() {
                     >
                       <Home className="w-4 h-4" />
                       Main Menu
+                    </button>
+                    <button 
+                      onClick={forceClearGame}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-rose-500/10 transition-colors text-sm font-medium border-t border-white/5 text-rose-500"
+                    >
+                      <AlertTriangle className="w-4 h-4" />
+                      Force Exit (Stuck)
                     </button>
                   </motion.div>
                 )}

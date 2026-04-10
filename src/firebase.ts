@@ -18,6 +18,7 @@ const firebaseConfig = configFromFile || {
 
 // @ts-ignore
 const databaseId = firebaseConfig.firestoreDatabaseId || import.meta.env.VITE_FIREBASE_DATABASE_ID || '(default)';
+console.log("Firebase Database ID:", databaseId);
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, databaseId);
@@ -110,10 +111,14 @@ export function sanitizeForFirestore<T>(data: T): T {
 // Connection test
 async function testConnection() {
   try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
+    const testDoc = doc(db, 'test', 'connection');
+    await getDocFromServer(testDoc);
+    console.log("Firestore connection test successful (read).");
   } catch (error) {
     if (error instanceof Error && error.message.includes('the client is offline')) {
       console.error("Please check your Firebase configuration. The client is offline.");
+    } else {
+      console.warn("Firestore connection test warning (read):", error);
     }
   }
 }
