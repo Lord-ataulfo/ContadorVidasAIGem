@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { CommanderCard } from '../types.ts';
 import { extractCardName } from '../services/aiService.ts';
 import { addCommander, getCommanders, updateCommander, deleteCommander, listenToCommanders } from '../services/authService.ts';
+import { resizeImage, isBase64SizeValid } from '../lib/imageUtils.ts';
 
 interface CommanderModalProps {
   isOpen: boolean;
@@ -26,6 +27,7 @@ export const CommanderModal: React.FC<CommanderModalProps> = ({
   const [isExtracting, setIsExtracting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editingCard, setEditingCard] = useState<CommanderCard | null>(null);
+  const [error, setError] = useState<string | null>(null);
   
   // Form state
   const [cardName, setCardName] = useState('');
@@ -69,17 +71,40 @@ export const CommanderModal: React.FC<CommanderModalProps> = ({
   const handleSave = async () => {
     if (!cardName || !previewUrl) return;
     setIsSaving(true);
+    setError(null);
     try {
+      // Resize and compress image before saving to stay under 1MB Firestore limit
+      let finalImageUrl = previewUrl;
+      try {
+        finalImageUrl = await resizeImage(previewUrl, 600, 800, 0.6);
+        
+        // Final check
+        if (!isBase64SizeValid(finalImageUrl, 900000)) {
+          throw new Error("La imagen es demasiado pesada incluso después de comprimirla. Intenta con otra foto.");
+        }
+      } catch (resizeErr) {
+        console.warn("Resize failed, attempting original:", resizeErr);
+      }
+
       if (activeTab === 'add') {
-        await addCommander(uid, { name: cardName, imageURL: previewUrl });
+        await addCommander(uid, { name: cardName, imageURL: finalImageUrl });
         setActiveTab('list');
       } else if (activeTab === 'edit' && editingCard) {
-        await updateCommander(uid, editingCard.id, { name: cardName, imageURL: previewUrl });
+        await updateCommander(uid, editingCard.id, { name: cardName, imageURL: finalImageUrl });
         setActiveTab('list');
       }
       resetForm();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Save Error:", error);
+      let message = "Error al guardar el comandante.";
+      if (error.message?.includes("too large") || error.message?.includes("limit")) {
+        message = "La imagen es demasiado grande para guardarla. Intenta con una foto de menor resolución.";
+      } else if (typeof error === 'string') {
+        message = error;
+      } else if (error.message) {
+        message = error.message;
+      }
+      setError(message);
     } finally {
       setIsSaving(false);
     }
@@ -108,6 +133,7 @@ export const CommanderModal: React.FC<CommanderModalProps> = ({
     setCardName('');
     setPreviewUrl(null);
     setEditingCard(null);
+    setError(null);
   };
 
   if (!isOpen) return null;
@@ -215,6 +241,12 @@ export const CommanderModal: React.FC<CommanderModalProps> = ({
                   </h3>
                   <p className="text-sm text-gray-500">Sube una foto de tu carta para identificarla</p>
                 </div>
+
+                {error && (
+                  <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-red-600 text-xs font-medium animate-shake">
+                    {error}
+                  </div>
+                )}
 
                 {!previewUrl ? (
                   <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 space-y-4">
