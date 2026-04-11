@@ -140,7 +140,10 @@ export default function App() {
       const unsubscribe = listenForInvites(userProfile.uid, (games) => {
         if (games.length > 0) {
           // Find the most recent active game that isn't the current one
-          const game = games.find(g => g.id !== gameState?.id);
+          const game = [...games]
+            .filter(g => g.id !== gameState?.id)
+            .sort((a, b) => b.startTime - a.startTime)[0];
+            
           if (!game) return;
 
           // Check for timeout (2 hours of inactivity)
@@ -403,10 +406,19 @@ export default function App() {
       setShowLoginSuggestion(true);
       return;
     }
-    proceedWithGame(type, playerConfigs, isWaitingForCommanders);
+    
+    // Default to true for commander games if not specified
+    const shouldWait = isWaitingForCommanders ?? (type === 'commander');
+    proceedWithGame(type, playerConfigs, shouldWait);
   };
 
   const proceedWithGame = async (type: GameType, playerConfigs: { name: string; color: string; uid?: string; userCode?: string; photoURL?: string; commanderCard?: CommanderCard }[], isWaitingForCommanders?: boolean) => {
+    // If we are already in a game (e.g. just finished one), clear it from Firestore first
+    if (gameState?.id && gameState.hostUid === userProfile?.uid) {
+      console.log("Cleaning up old game before starting new one:", gameState.id);
+      await deleteActiveGame(gameState.id);
+    }
+
     let initialLife = type === 'standard' ? 20 : 40;
     
     // Rule: 30 life for 2-player Commander
@@ -671,9 +683,13 @@ export default function App() {
       name: p.name,
       color: p.color,
       uid: p.uid,
-      userCode: p.userCode
+      userCode: p.userCode,
+      photoURL: p.photoURL
     }));
-    startGame(gameState.gameType, playerConfigs);
+    
+    // For commander games, we always want to wait for commanders on reset
+    const shouldWait = gameState.gameType === 'commander';
+    startGame(gameState.gameType, playerConfigs, shouldWait);
     setShowMenu(false);
   };
 
