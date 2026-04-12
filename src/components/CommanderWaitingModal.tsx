@@ -9,13 +9,15 @@ interface CommanderWaitingModalProps {
   currentUserUid: string;
   onSelectCommander: (commander: CommanderCard | null) => void;
   onReady: () => void;
+  onCancel: () => void;
 }
 
 export const CommanderWaitingModal: React.FC<CommanderWaitingModalProps> = ({
   gameState,
   currentUserUid,
   onSelectCommander,
-  onReady
+  onReady,
+  onCancel
 }) => {
   const [savedCommanders, setSavedCommanders] = useState<CommanderCard[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -185,6 +187,23 @@ export const CommanderWaitingModal: React.FC<CommanderWaitingModalProps> = ({
                 <h3 className="text-xl font-bold text-white uppercase tracking-tight">Esperando a los demás...</h3>
                 <p className="text-zinc-500 text-sm">La partida iniciará automáticamente cuando todos estén listos.</p>
               </div>
+              
+              <button 
+                onClick={onCancel}
+                className="px-6 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 rounded-xl text-xs font-bold transition-all uppercase tracking-widest"
+              >
+                Cancelar Partida
+              </button>
+
+              <button 
+                onClick={() => {
+                  localStorage.clear();
+                  window.location.reload();
+                }}
+                className="text-[10px] text-zinc-700 hover:text-zinc-500 transition-colors uppercase tracking-widest mt-4"
+              >
+                ¿Sigues trabado? Reinicio Forzado
+              </button>
             </div>
           )}
         </div>

@@ -94,6 +94,7 @@ const PLAYER_COLORS = [
 
 export default function App() {
   const [gameState, setGameState] = useState<GameState | null>(null);
+  const [rejectedGameIds, setRejectedGameIds] = useState<Set<string>>(new Set());
   const [showMenu, setShowMenu] = useState(false);
   const [selectedPlayerForDamage, setSelectedPlayerForDamage] = useState<number | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -139,9 +140,9 @@ export default function App() {
     if (isAuthReady && userProfile && (!gameState || gameState.isGameOver)) {
       const unsubscribe = listenForInvites(userProfile.uid, (games) => {
         if (games.length > 0) {
-          // Find the most recent active game that isn't the current one
+          // Find the most recent active game that isn't the current one and isn't rejected
           const game = [...games]
-            .filter(g => g.id !== gameState?.id)
+            .filter(g => g.id !== gameState?.id && !rejectedGameIds.has(g.id))
             .sort((a, b) => b.startTime - a.startTime)[0];
             
           if (!game) return;
@@ -200,7 +201,7 @@ export default function App() {
       });
       return () => unsubscribe();
     }
-  }, [isAuthReady, userProfile, gameState?.id, gameState?.isGameOver]);
+  }, [isAuthReady, userProfile, gameState?.id, gameState?.isGameOver, rejectedGameIds]);
 
   // Check for game timeout (2 hours of inactivity)
   useEffect(() => {
@@ -218,6 +219,41 @@ export default function App() {
     const interval = setInterval(checkTimeout, 60000); // Check every minute
     return () => clearInterval(interval);
   }, [gameState?.id, gameState?.isGameOver, gameState?.lastLifeChangeTimestamp]);
+
+  // Emergency Reset for stuck games (runs once on load)
+  useEffect(() => {
+    if (gameState?.isWaitingForCommanders && gameState.startTime) {
+      const now = Date.now();
+      const tenMinutes = 10 * 60 * 1000;
+      if (now - gameState.startTime > tenMinutes) {
+        console.log("Emergency reset: clearing stuck game session");
+        if (gameState.hostUid === userProfile?.uid && gameState.id) {
+          deleteActiveGame(gameState.id);
+        }
+        setGameState(null);
+      }
+    }
+  }, []); // Only run once on mount
+
+  // Check for commander selection timeout (10 minutes)
+  useEffect(() => {
+    if (!gameState || !gameState.isWaitingForCommanders || !gameState.startTime) return;
+
+    const checkCommanderTimeout = () => {
+      const now = Date.now();
+      const tenMinutes = 10 * 60 * 1000;
+      if (now - gameState.startTime > tenMinutes) {
+        console.log("Commander selection timed out");
+        if (gameState.hostUid === userProfile?.uid && gameState.id) {
+          deleteActiveGame(gameState.id);
+        }
+        setGameState(null);
+      }
+    };
+
+    const interval = setInterval(checkCommanderTimeout, 30000); // Check every 30 seconds
+    return () => clearInterval(interval);
+  }, [gameState?.id, gameState?.isWaitingForCommanders, gameState?.startTime, userProfile?.uid]);
 
   // Sincronización en tiempo real: Escucha cambios en la partida activa desde Firestore
   useEffect(() => {
@@ -677,6 +713,23 @@ export default function App() {
     // unless the game is over. If the user wants to go home, they use exitToHome.
   };
 
+  const handleCancelGame = () => {
+    if (!gameState || !userProfile) return;
+    
+    const gameId = gameState.id;
+    console.log("Cancelling game:", gameId);
+    
+    if (gameId) {
+      // Add to rejected list so we don't immediately re-join via listenForInvites
+      setRejectedGameIds(prev => new Set(prev).add(gameId));
+      
+      if (gameState.hostUid === userProfile.uid) {
+        deleteActiveGame(gameId);
+      }
+    }
+    setGameState(null);
+  };
+
   const resetGame = () => {
     if (!gameState) return;
     const playerConfigs = gameState.players.map(p => ({
@@ -944,6 +997,7 @@ export default function App() {
                 currentUserUid={userProfile.uid}
                 onSelectCommander={handleGuestCommanderSelect}
                 onReady={handleGuestReady}
+                onCancel={handleCancelGame}
               />
             )}
           </AnimatePresence>
